@@ -1,6 +1,6 @@
 from flask import Flask
 from database import get_db_connection, create_tables
-from auth import register
+from auth import register, login
 from games import submit_score, get_user_scores
 from reminders import create_reminder, get_reminders, update_reminder, delete_reminder
 from caregiver import get_patient_info, get_patient_progress
@@ -10,15 +10,25 @@ app = Flask(__name__)
 
 create_tables()
 
+
 @app.route("/")
 def home():
     return "CogniCare-AI Backend is running!"
 
 
+# ---------------- AUTH ----------------
+
 @app.route("/api/register", methods=["POST"])
 def register_user():
     return register()
 
+
+@app.route("/api/login", methods=["POST"])
+def login_user():
+    return login()
+
+
+# ---------------- GAMES ----------------
 
 @app.route("/api/games/submit", methods=["POST"])
 def submit_game_score():
@@ -29,6 +39,8 @@ def submit_game_score():
 def fetch_user_scores(user_id):
     return get_user_scores(user_id)
 
+
+# ---------------- REMINDERS ----------------
 
 @app.route("/api/reminders", methods=["POST"])
 def add_reminder():
@@ -50,6 +62,8 @@ def remove_reminder(reminder_id):
     return delete_reminder(reminder_id)
 
 
+# ---------------- CAREGIVER ----------------
+
 @app.route("/api/caregiver/patient/<int:patient_id>", methods=["GET"])
 def fetch_patient_info(patient_id):
     return get_patient_info(patient_id)
@@ -58,6 +72,9 @@ def fetch_patient_info(patient_id):
 @app.route("/api/caregiver/progress/<int:patient_id>", methods=["GET"])
 def fetch_patient_progress(patient_id):
     return get_patient_progress(patient_id)
+
+
+# ---------------- AI DIFFICULTY ----------------
 
 @app.route("/api/difficulty/performance", methods=["POST"])
 def log_performance():
@@ -78,6 +95,8 @@ def update_difficulty():
 def fetch_difficulty(user_id, game_name):
     return get_difficulty(user_id, game_name)
 
+
+# ---------------- RUN SERVER ----------------
 
 if __name__ == "__main__":
     app.run(debug=True)

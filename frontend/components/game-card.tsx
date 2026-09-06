@@ -52,7 +52,7 @@ export function GameCard({ game }: { game: Game }) {
 
       <Button
         className={cn('mt-5 w-full', !playable && 'opacity-90')}
-        render={playable ? <Link href="/games/memory-match" /> : <Link href="/games/memory-match" />}
+        render={playable ? <Link href="/games/memory-match" /> : <Link href="#" />}
       >
         <Play className="size-4" />
         Play Now

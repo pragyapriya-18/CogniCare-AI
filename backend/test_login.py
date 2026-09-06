@@ -1,13 +1,10 @@
 import requests
 
-url = "http://127.0.0.1:5000/api/register"
+url = "http://127.0.0.1:5000/api/login"
 
 data = {
-    "name": "Test User",
     "email": "newuser@gmail.com",
-    "password": "1234",
-    "role": "elderly",
-    "language": "Hindi"
+    "password": "1234"
 }
 
 response = requests.post(url, json=data)

@@ -1,6 +1,6 @@
 from flask import Flask
 from database import get_db_connection, create_tables
-from auth import register
+from auth import register, login
 
 app = Flask(__name__)
 
@@ -15,6 +15,9 @@ def home():
 def register_user():
     return register()
 
+@app.route("/api/login", methods=["POST"])
+def login_user():
+    return login()
 
 if __name__ == "__main__":
     app.run(debug=True)

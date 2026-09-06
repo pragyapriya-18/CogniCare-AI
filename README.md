@@ -66,7 +66,7 @@ CogniCare-AI/
 | ------------ | ---------------------------------------------------------------------------------------- |
 | Sameed Patil | Architecture, Coordination, Integration, Presentation, Research, Documentation & Testing |
 | Aayushman    | Frontend / UI                                                                            |
-| Pragya       | Backend                                                                                  |
+| Pragya       | Backend + Git/GitHub Management                                                                                 |
 | Priyanshi    | Backend                                                                                  |
 | Rajshree     | AI / ML                                                                                  |
 | Ritu         | Cognitive Game Development                                                               |

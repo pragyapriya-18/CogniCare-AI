@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+const API_URL = 'http://127.0.0.1:5000'
 import { useRouter } from 'next/navigation'
 import {
   Heart,
@@ -92,17 +93,53 @@ export default function MemoryMatchPage() {
     return () => clearInterval(t)
   }, [paused, showExit, won])
 
-  // Win -> results
-  React.useEffect(() => {
-    if (!won) return
-    const accuracy = Math.round((totalPairs / Math.max(moves, totalPairs)) * 100)
-    const t = setTimeout(() => {
-      router.push(
-        `/results?score=${score}&time=${seconds}&moves=${moves}&accuracy=${accuracy}`,
-      )
-    }, 900)
-    return () => clearTimeout(t)
-  }, [won, router, score, seconds, moves, totalPairs])
+// Win -> save score to backend -> results
+React.useEffect(() => {
+  if (!won) return
+
+  const accuracy = Math.round(
+    (totalPairs / Math.max(moves, totalPairs)) * 100
+  )
+
+  const saveScore = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/games/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: 1,
+          game_name: 'Memory Match',
+          score: score,
+          accuracy: accuracy,
+          time_taken: seconds,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Backend error:', data)
+        return
+      }
+
+      console.log('Score saved successfully:', data)
+    } catch (error) {
+      console.error('Failed to connect to backend:', error)
+    }
+  }
+
+  saveScore()
+
+  const t = setTimeout(() => {
+    router.push(
+      `/results?score=${score}&time=${seconds}&moves=${moves}&accuracy=${accuracy}`,
+    )
+  }, 900)
+
+  return () => clearTimeout(t)
+}, [won, router, score, seconds, moves, totalPairs])
 
   const handleFlip = (index: number) => {
     if (locked || paused || flipped.includes(index) || matched.includes(index)) return

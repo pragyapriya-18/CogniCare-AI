@@ -5,6 +5,7 @@ from games import submit_score, get_user_scores
 from reminders import create_reminder, get_reminders, update_reminder, delete_reminder
 from caregiver import get_patient_info, get_patient_progress
 from difficulty import submit_performance, get_performance_history, set_difficulty, get_difficulty
+from progress import get_progress
 
 app = Flask(__name__)
 
@@ -73,6 +74,11 @@ def fetch_patient_info(patient_id):
 def fetch_patient_progress(patient_id):
     return get_patient_progress(patient_id)
 
+# ---------------- PROGRESS ----------------
+
+@app.route("/api/progress/<int:user_id>", methods=["GET"])
+def fetch_progress(user_id):
+    return get_progress(user_id)
 
 # ---------------- AI DIFFICULTY ----------------
 

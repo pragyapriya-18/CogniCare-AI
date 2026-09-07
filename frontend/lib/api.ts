@@ -1,0 +1,70 @@
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+async function request<T>(
+  endpoint: string,
+  options?: RequestInit
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error || "API request failed");
+  }
+
+  return data;
+}
+
+// Progress
+export async function getProgress(userId: number) {
+  return request(`/api/progress/${userId}`);
+}
+
+// Difficulty performance
+export async function getDifficultyPerformance(userId: number) {
+  return request(`/api/difficulty/performance/${userId}`);
+}
+
+// Get difficulty for a particular game
+export async function getDifficulty(
+  userId: number,
+  gameName: string
+) {
+  return request(
+    `/api/difficulty/${userId}/${encodeURIComponent(gameName)}`
+  );
+}
+
+// Set/update difficulty
+export async function setDifficulty(
+  userId: number,
+  gameName: string,
+  difficultyLevel: string
+) {
+  return request("/api/difficulty/set", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      game_name: gameName,
+      difficulty_level: difficultyLevel,
+    }),
+  });
+}
+
+// Login
+export async function loginUser(email: string, password: string) {
+  return request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+}

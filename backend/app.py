@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 from database import get_db_connection, create_tables
 from auth import register, login
 from games import submit_score, get_user_scores
@@ -8,7 +9,7 @@ from difficulty import submit_performance, get_performance_history, set_difficul
 from progress import get_progress
 
 app = Flask(__name__)
-
+CORS(app)
 create_tables()
 
 

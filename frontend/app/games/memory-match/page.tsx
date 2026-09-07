@@ -40,17 +40,19 @@ const faces: Face[] = [
 
 type Tile = { id: number; faceIndex: number }
 
-function orderedDeck(): Tile[] {
+function orderedDeck(pairCount: number): Tile[] {
   const deck: Tile[] = []
-  faces.forEach((_, faceIndex) => {
+
+  faces.slice(0, pairCount).forEach((_, faceIndex) => {
     deck.push({ id: faceIndex * 2, faceIndex })
     deck.push({ id: faceIndex * 2 + 1, faceIndex })
   })
+
   return deck
 }
 
-function buildDeck(): Tile[] {
-  const deck = orderedDeck()
+function buildDeck(pairCount: number): Tile[] {
+  const deck = orderedDeck(pairCount)
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[deck[i], deck[j]] = [deck[j], deck[i]]
@@ -66,7 +68,8 @@ function formatTime(s: number) {
 
 export default function MemoryMatchPage() {
   const router = useRouter()
-  const [deck, setDeck] = React.useState<Tile[]>(orderedDeck)
+  const [difficulty, setDifficulty] = React.useState<'easy' | 'medium' | 'hard'>('easy')
+  const [deck, setDeck] = React.useState<Tile[]>([])
   const [flipped, setFlipped] = React.useState<number[]>([])
   const [matched, setMatched] = React.useState<number[]>([])
   const [moves, setMoves] = React.useState(0)
@@ -75,15 +78,35 @@ export default function MemoryMatchPage() {
   const [showExit, setShowExit] = React.useState(false)
   const [locked, setLocked] = React.useState(false)
 
-  const totalPairs = faces.length
+  const totalPairs =
+  difficulty === 'easy'
+    ? 4
+    : difficulty === 'medium'
+      ? 6
+      : 8
   const matchedPairs = matched.length / 2
   const score = Math.max(0, matchedPairs * 120 - moves * 8)
   const won = matchedPairs === totalPairs
 
   // Shuffle only on the client after mount to avoid SSR hydration mismatch
   React.useEffect(() => {
-    setDeck(buildDeck())
-  }, [])
+  const params = new URLSearchParams(window.location.search)
+  const value = params.get('difficulty')
+
+  const selectedDifficulty =
+    value === 'medium' || value === 'hard' ? value : 'easy'
+
+  setDifficulty(selectedDifficulty)
+
+  const pairCount =
+    selectedDifficulty === 'easy'
+      ? 4
+      : selectedDifficulty === 'medium'
+        ? 6
+        : 8
+
+  setDeck(buildDeck(pairCount))
+}, [])
 
   // Timer
   React.useEffect(() => {
@@ -129,7 +152,15 @@ export default function MemoryMatchPage() {
   }
 
   const restart = () => {
-    setDeck(buildDeck())
+    setDeck(
+  buildDeck(
+    difficulty === 'easy'
+      ? 4
+      : difficulty === 'medium'
+        ? 6
+        : 8
+  )
+)
     setFlipped([])
     setMatched([])
     setMoves(0)

@@ -16,6 +16,48 @@ const difficultyVariant = {
 export function GameCard({ game }: { game: Game }) {
   const Icon = game.icon
 
+  const difficultyButtons = (
+    gameSlug: string,
+  ) => (
+    <div className="mt-5 grid grid-cols-3 gap-2">
+      <Button
+        className="w-full"
+        variant="outline"
+        render={
+          <Link
+            href={`/games/${gameSlug}?difficulty=easy`}
+          />
+        }
+      >
+        Easy
+      </Button>
+
+      <Button
+        className="w-full"
+        variant="outline"
+        render={
+          <Link
+            href={`/games/${gameSlug}?difficulty=medium`}
+          />
+        }
+      >
+        Medium
+      </Button>
+
+      <Button
+        className="w-full"
+        variant="outline"
+        render={
+          <Link
+            href={`/games/${gameSlug}?difficulty=hard`}
+          />
+        }
+      >
+        Hard
+      </Button>
+    </div>
+  )
+
   return (
     <Card className="group flex flex-col overflow-hidden p-5 transition-all hover:-translate-y-1 hover:shadow-lg">
       <div className="flex items-start justify-between">
@@ -54,115 +96,32 @@ export function GameCard({ game }: { game: Game }) {
         </span>
 
         <span className="inline-flex items-center gap-1">
-          <Clock className="size-3.5" />~{game.estimatedMinutes} min
+          <Clock className="size-3.5" />
+          ~{game.estimatedMinutes} min
         </span>
       </div>
 
-      {game.slug === 'memory-match' ? (
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/memory-match?difficulty=easy" />
-            }
-          >
-            Easy
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/memory-match?difficulty=medium" />
-            }
-          >
-            Medium
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/memory-match?difficulty=hard" />
-            }
-          >
-            Hard
-          </Button>
-        </div>
-      ) : game.slug === 'sequence-recall' ? (
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/sequence-recall?difficulty=easy" />
-            }
-          >
-            Easy
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/sequence-recall?difficulty=medium" />
-            }
-          >
-            Medium
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/sequence-recall?difficulty=hard" />
-            }
-          >
-            Hard
-          </Button>
-        </div>
-      ) : game.slug === 'pattern-recognition' ? (
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/pattern-recognition?difficulty=easy" />
-            }
-          >
-            Easy
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/pattern-recognition?difficulty=medium" />
-            }
-          >
-            Medium
-          </Button>
-
-          <Button
-            className="w-full"
-            variant="outline"
-            render={
-              <Link href="/games/pattern-recognition?difficulty=hard" />
-            }
-          >
-            Hard
-          </Button>
-        </div>
-      ) : (
-        <Button
-          className="mt-5 w-full opacity-90"
-          render={<Link href="#" />}
-        >
-          <Play className="size-4" />
-          Play Now
-        </Button>
-      )}
+      {game.slug === 'memory-match'
+        ? difficultyButtons('memory-match')
+        : game.slug === 'sequence-recall'
+          ? difficultyButtons('sequence-recall')
+          : game.slug === 'pattern-recognition'
+            ? difficultyButtons('pattern-recognition')
+            : game.slug === 'focus-challenge'
+  ? difficultyButtons('focus-challenge')
+  : game.slug === 'reaction-test'
+  ? difficultyButtons('reaction-test')
+  : game.slug === 'number-recall'
+    ? difficultyButtons('number-recall')
+    : (
+                <Button
+                  className="mt-5 w-full opacity-90"
+                  render={<Link href="#" />}
+                >
+                  <Play className="size-4" />
+                  Play Now
+                </Button>
+              )}
     </Card>
   )
 }

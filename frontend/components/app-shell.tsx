@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Gamepad2,
@@ -28,6 +28,7 @@ const nav = [
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const router = useRouter()
   return (
     <nav className="flex flex-col gap-1">
       {nav.map((item) => {
@@ -101,10 +102,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false)
   const pathname = usePathname()
+  const router = useRouter()
 
   React.useEffect(() => {
     setOpen(false)
   }, [pathname])
+  React.useEffect(() => {
+  const user = localStorage.getItem('user')
+
+  if (!user && pathname !== '/login') {
+    router.push('/login')
+  }
+}, [pathname, router])
 
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[272px_1fr]">

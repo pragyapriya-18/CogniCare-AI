@@ -59,12 +59,44 @@ export async function setDifficulty(
 }
 
 // Login
-export async function loginUser(email: string, password: string) {
-  return request("/api/login", {
+type LoginResponse = {
+  message: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role?: string;
+  };
+};
+
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<LoginResponse> {
+  return request<LoginResponse>("/api/login", {
     method: "POST",
     body: JSON.stringify({
       email,
       password,
+    }),
+  });
+}
+type RegisterResponse = {
+  message: string;
+};
+
+export async function registerUser(
+  name: string,
+  email: string,
+  password: string
+): Promise<RegisterResponse> {
+  return request<RegisterResponse>("/api/register", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      role: "patient",
     }),
   });
 }

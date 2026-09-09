@@ -94,13 +94,8 @@ export default function MemoryMatchPage() {
   const params = new URLSearchParams(window.location.search)
   const value = params.get('difficulty')
 
-  const savedDifficulty = localStorage.getItem('nextDifficulty')
-  const actualDifficulty = value || savedDifficulty
-  const normalizedDifficulty = actualDifficulty?.toLowerCase()
-
-
   const selectedDifficulty =
-    normalizedDifficulty === 'medium' || normalizedDifficulty === 'hard' ? normalizedDifficulty : 'easy'
+    value === 'medium' || value === 'hard' ? value : 'easy'
 
   setDifficulty(selectedDifficulty)
 
@@ -168,49 +163,6 @@ React.useEffect(() => {
 
   return () => clearTimeout(t)
 }, [won, router, score, seconds, moves, totalPairs])
-
-
-// AI -> predict next difficulty
-React.useEffect(() => {
-  if (!won) return
-
-  const accuracy = Math.round(
-    (totalPairs / Math.max(moves, totalPairs)) * 100
-  )
-
-  const predictNextDifficulty = async () => {
-    try {
-      const response = await fetch(
-        `${API_URL}/api/difficulty/predict`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            accuracy: accuracy,
-            score: score,
-            time_taken: seconds,
-          }),
-        }
-      )
-
-      const data = await response.json()
-
-      console.log('AI predicted difficulty:', data.predicted_difficulty)
-
-      localStorage.setItem(
-        'nextDifficulty',
-        data.predicted_difficulty
-      )
-    } catch (error) {
-      console.error('AI difficulty prediction failed:', error)
-    }
-  }
-
-  predictNextDifficulty()
-}, [won, score, seconds, moves, totalPairs])
-
 
   const handleFlip = (index: number) => {
     if (locked || paused || flipped.includes(index) || matched.includes(index)) return

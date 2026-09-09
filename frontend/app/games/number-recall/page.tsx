@@ -30,6 +30,10 @@ export default function NumberRecallPage() {
   const [score, setScore] = React.useState(0);
   const [message, setMessage] = React.useState("Press Start to begin");
 
+const [finalScore, setFinalScore] = React.useState(0);
+const responseTimes = React.useRef<number[]>([]);
+const responseStartTime = React.useRef<number | null>(null);
+
   const current = settings[difficulty];
 
   React.useEffect(() => {
@@ -40,6 +44,59 @@ export default function NumberRecallPage() {
     }
   }, []);
 
+  // AI -> predict next difficulty
+React.useEffect(() => {
+  if (!finished) return
+
+  const accuracy = Math.round(
+  (finalScore / (current.rounds * current.points)) * 100
+);
+
+const averageResponseTime =
+  responseTimes.current.length > 0
+    ? responseTimes.current.reduce((sum, time) => sum + time, 0) /
+      responseTimes.current.length
+    : 0;
+  const predictNextDifficulty = async () => {
+
+    console.log("AI INPUT:", {
+  accuracy,
+  score: accuracy,
+  time_taken: averageResponseTime,
+});
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:5000/api/difficulty/predict",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            accuracy: accuracy,
+            score: score,
+            time_taken: 0,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      console.log("AI predicted difficulty:", data.predicted_difficulty)
+
+      localStorage.setItem(
+        "nextDifficulty",
+        data.predicted_difficulty
+      )
+    } catch (error) {
+      console.error("AI difficulty prediction failed:", error)
+    }
+  }
+
+  predictNextDifficulty()
+}, [finished, score, current])
+
   const startRound = () => {
     const newNumber = makeNumber(current.digits);
 
@@ -49,37 +106,52 @@ export default function NumberRecallPage() {
     setMessage("Remember the number!");
 
     setTimeout(() => {
-      setShowNumber(false);
-      setMessage("Enter the number");
-    }, current.time);
-  };
+  setShowNumber(false);
+  setMessage("Enter the number");
+  responseStartTime.current = Date.now();
+}, current.time);
 
+  };
   const startGame = () => {
-    setStarted(true);
-    setFinished(false);
-    setRound(1);
-    setScore(0);
-    startRound();
-  };
+  setStarted(true);
+  setFinished(false);
+  setRound(1);
+  setScore(0);
+  setFinalScore(0);
+  
+  responseTimes.current = [];
+  responseStartTime.current = null;
 
+  startRound();
+};
   const submitAnswer = () => {
     if (!started || showNumber || !answer) return;
 
     const correct = answer === number;
 
-    if (correct) {
-      setScore((prev) => prev + current.points);
-      setMessage("Correct! 🎉");
-    } else {
-      setMessage(`Wrong! Answer was ${number}`);
-    }
+    const elapsedTime = responseStartTime.current
+  ? (Date.now() - responseStartTime.current) / 1000
+  : 0;
 
+responseTimes.current.push(elapsedTime);
+
+    const newScore = correct
+  ? score + current.points
+  : score;
+
+setScore(newScore);
+
+if (correct) {
+  setMessage("Correct! 🎉");
+} else {
+  setMessage(`Wrong! Answer was ${number}`);
+}
     if (round >= current.rounds) {
-      setFinished(true);
-      setStarted(false);
-      return;
-    }
-
+  setFinalScore(newScore);
+  setFinished(true);
+  setStarted(false);
+  return;
+}
     setTimeout(() => {
       setRound((prev) => prev + 1);
       startRound();
@@ -87,16 +159,47 @@ export default function NumberRecallPage() {
   };
 
   const restart = () => {
-    setNumber("");
-    setAnswer("");
-    setShowNumber(false);
-    setStarted(false);
-    setFinished(false);
-    setRound(1);
-    setScore(0);
-    setMessage("Press Start to begin");
-  };
+  setNumber("");
+  setAnswer("");
+  setShowNumber(false);
+  setStarted(false);
+  setFinished(false);
+  setRound(1);
+  setScore(0);
+  setFinalScore(0);
 
+  responseTimes.current = [];
+  responseStartTime.current = null;
+
+  setMessage("Press Start to begin");
+};
+    const playAgain = () => {
+  const savedDifficulty = localStorage.getItem("nextDifficulty");
+
+  const nextDifficulty = savedDifficulty?.toLowerCase();
+
+  if (
+    nextDifficulty === "easy" ||
+    nextDifficulty === "medium" ||
+    nextDifficulty === "hard"
+  ) {
+    setDifficulty(nextDifficulty);
+  }
+
+  setNumber("");
+  setAnswer("");
+  setShowNumber(false);
+  setStarted(false);
+  setFinished(false);
+  setRound(1);
+setScore(0);
+setFinalScore(0);
+
+responseTimes.current = [];
+responseStartTime.current = null;
+
+setMessage("Press Start to begin");
+};
   const changeDifficulty = (value: Difficulty) => {
     restart();
     setDifficulty(value);
@@ -204,7 +307,7 @@ export default function NumberRecallPage() {
             )}
 
             {started && !finished && (
-              <Button variant="outline" onClick={restart}>
+              <Button variant="outline" onClick={playAgain}>
                 <RotateCcw className="mr-2 size-4" />
                 Restart
               </Button>
@@ -222,7 +325,7 @@ export default function NumberRecallPage() {
               </p>
 
               <div className="mt-6 flex justify-center gap-3">
-                <Button onClick={restart}>
+                <Button onClick={playAgain}>
                   <RotateCcw className="mr-2 size-4" />
                   Play Again
                 </Button>

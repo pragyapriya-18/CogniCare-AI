@@ -12,6 +12,7 @@ import {
   X,
   Play,
   Flame,
+  LogOut,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -29,6 +30,7 @@ const nav = [
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+ 
   return (
     <nav className="flex flex-col gap-1">
       {nav.map((item) => {
@@ -74,6 +76,12 @@ function StreakCard() {
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter()
+
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    router.push('/login')
+  }
   return (
     <div className="flex h-full flex-col gap-6 p-4">
       <div className="px-2 pt-2">
@@ -87,6 +95,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <StreakCard />
       <div className="flex items-center gap-3 rounded-2xl border border-border p-3">
+        <button
+  onClick={handleLogout}
+  className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+>
+  <LogOut className="size-4" />
+  Logout
+</button>
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-chart-5 text-sm font-semibold text-primary-foreground">
           {user.avatarInitials}
         </span>
@@ -110,8 +125,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
   const user = localStorage.getItem('user')
 
-  if (!user && pathname !== '/login') {
-    router.push('/login')
+  if (!user && pathname !== '/login' && pathname !== '/register') {
+    router.replace('/login')
   }
 }, [pathname, router])
 

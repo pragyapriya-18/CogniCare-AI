@@ -1,20 +1,24 @@
 from flask import jsonify
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 
 def get_progress(user_id):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        user = connection.execute(
-            "SELECT id, name, email FROM users WHERE id = ?",
+        cursor.execute(
+            "SELECT id, name, email FROM users WHERE id = %s",
             (user_id,)
-        ).fetchone()
+        )
+
+        user = cursor.fetchone()
 
         if user is None:
             return jsonify({"error": "User not found"}), 404
 
-        progress = connection.execute(
+        cursor.execute(
             """
             SELECT
                 COUNT(*) AS games_played,
@@ -23,10 +27,12 @@ def get_progress(user_id):
                 COALESCE(AVG(accuracy), 0) AS average_accuracy,
                 COALESCE(SUM(time_taken), 0) AS total_time
             FROM game_scores
-            WHERE user_id = ?
+            WHERE user_id = %s
             """,
             (user_id,)
-        ).fetchone()
+        )
+
+        progress = cursor.fetchone()
 
         return jsonify({
             "user": dict(user),
@@ -34,4 +40,5 @@ def get_progress(user_id):
         }), 200
 
     finally:
+        cursor.close()
         connection.close()

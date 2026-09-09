@@ -1,19 +1,23 @@
 from flask import jsonify
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 
 def get_patient_info(patient_id):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        row = connection.execute(
+        cursor.execute(
             """
             SELECT id, name, email, role, language
             FROM users
-            WHERE id = ? AND role = 'elderly'
+            WHERE id = %s AND role = 'elderly'
             """,
             (patient_id,)
-        ).fetchone()
+        )
+
+        row = cursor.fetchone()
 
         if not row:
             return jsonify({"error": "Patient not found"}), 404
@@ -26,40 +30,52 @@ def get_patient_info(patient_id):
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
 def get_patient_progress(patient_id):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        patient = connection.execute(
-            "SELECT id, name FROM users WHERE id = ? AND role = 'elderly'",
+        cursor.execute(
+            """
+            SELECT id, name
+            FROM users
+            WHERE id = %s AND role = 'elderly'
+            """,
             (patient_id,)
-        ).fetchone()
+        )
+
+        patient = cursor.fetchone()
 
         if not patient:
             return jsonify({"error": "Patient not found"}), 404
 
-        scores = connection.execute(
+        cursor.execute(
             """
             SELECT game_name, score, accuracy, time_taken, played_at
             FROM game_scores
-            WHERE user_id = ?
+            WHERE user_id = %s
             ORDER BY played_at DESC
             """,
             (patient_id,)
-        ).fetchall()
+        )
 
-        reminders = connection.execute(
+        scores = cursor.fetchall()
+
+        cursor.execute(
             """
             SELECT reminder_type, title, reminder_time, is_active
             FROM reminders
-            WHERE user_id = ?
+            WHERE user_id = %s
             ORDER BY reminder_time ASC
             """,
             (patient_id,)
-        ).fetchall()
+        )
+
+        reminders = cursor.fetchall()
 
         return jsonify({
             "patient_id": patient_id,
@@ -74,4 +90,5 @@ def get_patient_progress(patient_id):
         }), 400
 
     finally:
+        cursor.close()
         connection.close()

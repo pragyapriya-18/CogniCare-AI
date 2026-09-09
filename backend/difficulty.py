@@ -1,5 +1,6 @@
 from flask import request, jsonify
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 
 def submit_performance():
@@ -12,15 +13,19 @@ def submit_performance():
     time_taken = data.get("time_taken")
 
     if not user_id or not game_name or score is None:
-        return jsonify({"error": "user_id, game_name and score are required"}), 400
+        return jsonify({
+            "error": "user_id, game_name and score are required"
+        }), 400
 
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        connection.execute(
+        cursor.execute(
             """
-            INSERT INTO performance_logs (user_id, game_name, score, accuracy, time_taken)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO performance_logs
+            (user_id, game_name, score, accuracy, time_taken)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (user_id, game_name, score, accuracy, time_taken)
         )
@@ -32,27 +37,33 @@ def submit_performance():
         }), 201
 
     except Exception:
+        connection.rollback()
+
         return jsonify({
             "error": "Something went wrong while saving performance data"
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
 def get_performance_history(user_id):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        rows = connection.execute(
+        cursor.execute(
             """
             SELECT game_name, score, accuracy, time_taken, logged_at
             FROM performance_logs
-            WHERE user_id = ?
+            WHERE user_id = %s
             ORDER BY logged_at DESC
             """,
             (user_id,)
-        ).fetchall()
+        )
+
+        rows = cursor.fetchall()
 
         return jsonify({
             "user_id": user_id,
@@ -65,6 +76,7 @@ def get_performance_history(user_id):
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
@@ -76,36 +88,45 @@ def set_difficulty():
     difficulty_level = data.get("difficulty_level")
 
     if not user_id or not game_name or not difficulty_level:
-        return jsonify({"error": "user_id, game_name and difficulty_level are required"}), 400
+        return jsonify({
+            "error": "user_id, game_name and difficulty_level are required"
+        }), 400
 
     if difficulty_level not in ("Easy", "Medium", "Hard"):
-        return jsonify({"error": "difficulty_level must be Easy, Medium or Hard"}), 400
+        return jsonify({
+            "error": "difficulty_level must be Easy, Medium or Hard"
+        }), 400
 
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        existing = connection.execute(
+        cursor.execute(
             """
             SELECT id FROM difficulty_settings
-            WHERE user_id = ? AND game_name = ?
+            WHERE user_id = %s AND game_name = %s
             """,
             (user_id, game_name)
-        ).fetchone()
+        )
+
+        existing = cursor.fetchone()
 
         if existing:
-            connection.execute(
+            cursor.execute(
                 """
                 UPDATE difficulty_settings
-                SET difficulty_level = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? AND game_name = ?
+                SET difficulty_level = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s AND game_name = %s
                 """,
                 (difficulty_level, user_id, game_name)
             )
         else:
-            connection.execute(
+            cursor.execute(
                 """
-                INSERT INTO difficulty_settings (user_id, game_name, difficulty_level)
-                VALUES (?, ?, ?)
+                INSERT INTO difficulty_settings
+                (user_id, game_name, difficulty_level)
+                VALUES (%s, %s, %s)
                 """,
                 (user_id, game_name, difficulty_level)
             )
@@ -118,26 +139,32 @@ def set_difficulty():
         }), 200
 
     except Exception:
+        connection.rollback()
+
         return jsonify({
             "error": "Something went wrong while setting difficulty"
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
 def get_difficulty(user_id, game_name):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        row = connection.execute(
+        cursor.execute(
             """
             SELECT difficulty_level, updated_at
             FROM difficulty_settings
-            WHERE user_id = ? AND game_name = ?
+            WHERE user_id = %s AND game_name = %s
             """,
             (user_id, game_name)
-        ).fetchone()
+        )
+
+        row = cursor.fetchone()
 
         if not row:
             return jsonify({
@@ -159,4 +186,5 @@ def get_difficulty(user_id, game_name):
         }), 400
 
     finally:
+        cursor.close()
         connection.close()

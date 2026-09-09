@@ -1,4 +1,6 @@
+"use client";
 import Link from 'next/link'
+import * as React from 'react'
 import {
   Brain,
   Flame,
@@ -18,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  user,
+
   dashboardStats,
   cognitiveScores,
   weeklyPerformance,
@@ -26,13 +28,27 @@ import {
 } from '@/lib/mock-data'
 
 export default function DashboardPage() {
+  const [userName, setUserName] = React.useState('User')
+
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('user')
+
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser)
+        setUserName(parsedUser.name || parsedUser.firstName || 'User')
+      } catch {
+        setUserName('User')
+      }
+    }
+  }, [])
   const recommended = games[2]
   const RecIcon = recommended.icon
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title={`Welcome back, ${user.firstName}`}
+        title={`Welcome back, ${userName}`}
         description="Here's your cognitive training snapshot. Keep the momentum going today."
         actions={
           <Button render={<Link href="/games/memory-match" />}>

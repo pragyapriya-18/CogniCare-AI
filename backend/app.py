@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from database import get_db_connection, create_tables
+from database import create_tables
 from auth import register, login
 from games import submit_score, get_user_scores
 from reminders import create_reminder, get_reminders, update_reminder, delete_reminder
@@ -11,6 +11,7 @@ from adaptive_model import predict_difficulty
 
 app = Flask(__name__)
 CORS(app)
+
 create_tables()
 
 
@@ -18,8 +19,6 @@ create_tables()
 def home():
     return "CogniCare-AI Backend is running!"
 
-
-# ---------------- AUTH ----------------
 
 @app.route("/api/register", methods=["POST"])
 def register_user():
@@ -31,8 +30,6 @@ def login_user():
     return login()
 
 
-# ---------------- GAMES ----------------
-
 @app.route("/api/games/submit", methods=["POST"])
 def submit_game_score():
     return submit_score()
@@ -42,8 +39,6 @@ def submit_game_score():
 def fetch_user_scores(user_id):
     return get_user_scores(user_id)
 
-
-# ---------------- REMINDERS ----------------
 
 @app.route("/api/reminders", methods=["POST"])
 def add_reminder():
@@ -65,8 +60,6 @@ def remove_reminder(reminder_id):
     return delete_reminder(reminder_id)
 
 
-# ---------------- CAREGIVER ----------------
-
 @app.route("/api/caregiver/patient/<int:patient_id>", methods=["GET"])
 def fetch_patient_info(patient_id):
     return get_patient_info(patient_id)
@@ -76,13 +69,11 @@ def fetch_patient_info(patient_id):
 def fetch_patient_progress(patient_id):
     return get_patient_progress(patient_id)
 
-# ---------------- PROGRESS ----------------
 
 @app.route("/api/progress/<int:user_id>", methods=["GET"])
 def fetch_progress(user_id):
     return get_progress(user_id)
 
-# ---------------- AI DIFFICULTY ----------------
 
 @app.route("/api/difficulty/performance", methods=["POST"])
 def log_performance():

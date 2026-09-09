@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from database import get_db_connection
 from werkzeug.security import generate_password_hash, check_password_hash
+from psycopg2.extras import RealDictCursor
 
 
 def register():
@@ -13,33 +14,42 @@ def register():
     language = data.get("language")
 
     if not name or not email or not password or not role:
-        return jsonify({"error": "Please fill all required fields"}), 400
+        return jsonify({
+            "error": "Please fill all required fields"
+        }), 400
 
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
         hashed_password = generate_password_hash(password)
 
-        connection.execute(
+        cursor.execute(
             """
             INSERT INTO users (name, email, password, role, language)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, name, email, role, language
             """,
             (name, email, hashed_password, role, language)
         )
 
+        user = cursor.fetchone()
         connection.commit()
 
         return jsonify({
-            "message": "User registered successfully"
+            "message": "User registered successfully",
+            "user": dict(user)
         }), 201
 
-    except Exception:
+    except Exception as e:
+        connection.rollback()
+
         return jsonify({
             "error": "Email already exists"
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
@@ -55,12 +65,19 @@ def login():
         }), 400
 
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        user = connection.execute(
-            "SELECT * FROM users WHERE email = ?",
+        cursor.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE email = %s
+            """,
             (email,)
-        ).fetchone()
+        )
+
+        user = cursor.fetchone()
 
         if user is None:
             return jsonify({
@@ -84,4 +101,5 @@ def login():
         }), 200
 
     finally:
+        cursor.close()
         connection.close()

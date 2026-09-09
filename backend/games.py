@@ -1,5 +1,6 @@
 from flask import request, jsonify
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 
 def submit_score():
@@ -12,15 +13,19 @@ def submit_score():
     time_taken = data.get("time_taken")
 
     if not user_id or not game_name or score is None:
-        return jsonify({"error": "user_id, game_name and score are required"}), 400
+        return jsonify({
+            "error": "user_id, game_name and score are required"
+        }), 400
 
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        connection.execute(
+        cursor.execute(
             """
-            INSERT INTO game_scores (user_id, game_name, score, accuracy, time_taken)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO game_scores
+            (user_id, game_name, score, accuracy, time_taken)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (user_id, game_name, score, accuracy, time_taken)
         )
@@ -32,33 +37,37 @@ def submit_score():
         }), 201
 
     except Exception:
+        connection.rollback()
+
         return jsonify({
             "error": "Something went wrong while saving the score"
         }), 400
 
     finally:
+        cursor.close()
         connection.close()
 
 
 def get_user_scores(user_id):
     connection = get_db_connection()
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
 
     try:
-        rows = connection.execute(
+        cursor.execute(
             """
             SELECT id, game_name, score, accuracy, time_taken, played_at
             FROM game_scores
-            WHERE user_id = ?
+            WHERE user_id = %s
             ORDER BY played_at DESC
             """,
             (user_id,)
-        ).fetchall()
+        )
 
-        scores = [dict(row) for row in rows]
+        rows = cursor.fetchall()
 
         return jsonify({
             "user_id": user_id,
-            "scores": scores
+            "scores": [dict(row) for row in rows]
         }), 200
 
     except Exception:
@@ -67,4 +76,5 @@ def get_user_scores(user_id):
         }), 400
 
     finally:
+        cursor.close()
         connection.close()

@@ -1,152 +1,259 @@
-import { TrendingUp, Clock } from 'lucide-react'
-import { PageHeader } from '@/components/page-header'
-import { SkillScoreCard } from '@/components/skill-score-card'
-import { AchievementBadge } from '@/components/achievement-badge'
-import { BarChart, TrendChart } from '@/components/charts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  cognitiveScores,
-  weeklyPerformance,
-  improvementTrend,
-  gameHistory,
-  achievements,
-  skillMeta,
-} from '@/lib/mock-data'
+"use client";
 
-const difficultyVariant = { Easy: 'success', Medium: 'warning', Hard: 'default' } as const
+import { useEffect, useState } from "react";
+import { Clock, TrendingUp } from "lucide-react";
+
+import { PageHeader } from "@/components/page-header";
+import { AchievementBadge } from "@/components/achievement-badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { getProgress } from "@/lib/api";
+
+type ProgressData = {
+  average_accuracy: number;
+  average_score: number | string;
+  best_score: number;
+  games_played: number;
+  total_time: number;
+};
+
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  role?: string;
+};
 
 export default function ProgressPage() {
+  const [progress, setProgress] = useState<ProgressData>({
+    average_accuracy: 0,
+    average_score: 0,
+    best_score: 0,
+    games_played: 0,
+    total_time: 0,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+
+        if (!storedUser) {
+          setError("Please log in to view your progress.");
+          setLoading(false);
+          return;
+        }
+
+        const user: User = JSON.parse(storedUser);
+
+        if (!user.id) {
+          setError("User information is missing.");
+          setLoading(false);
+          return;
+        }
+
+        const data = await getProgress(user.id);
+
+        setProgress({
+          average_accuracy: Number(data?.progress?.average_accuracy ?? 0),
+          average_score: Number(data?.progress?.average_score ?? 0),
+          best_score: Number(data?.progress?.best_score ?? 0),
+          games_played: Number(data?.progress?.games_played ?? 0),
+          total_time: Number(data?.progress?.total_time ?? 0),
+        });
+      } catch (err) {
+        console.error("Failed to load progress:", err);
+        setError("Unable to load your progress.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProgress();
+  }, []);
+
+  const averageScore = Number(progress.average_score || 0);
+  const averageAccuracy = Number(progress.average_accuracy || 0);
+  const bestScore = Number(progress.best_score || 0);
+  const gamesPlayed = Number(progress.games_played || 0);
+  const totalTime = Number(progress.total_time || 0);
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Progress & Analytics"
-        description="Track how each cognitive skill evolves over time and review your game history."
+        description="Track your cognitive game performance and progress."
       />
 
-      {/* Skill scores */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cognitiveScores.map((s) => (
-          <SkillScoreCard key={s.skill} skill={s.skill} score={s.score} delta={s.delta} />
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Loading */}
+      {loading && (
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Weekly Performance</CardTitle>
-            <Badge variant="muted">
-              <Clock className="size-3" />
-              7 days
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <BarChart
-                data={weeklyPerformance.map((d) => ({ label: d.day, value: d.score }))}
-                color="var(--chart-2)"
-              />
-            </div>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            Loading your progress...
           </CardContent>
         </Card>
+      )}
 
+      {/* Error */}
+      {!loading && error && (
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Improvement Trend</CardTitle>
-            <Badge variant="success">
-              <TrendingUp className="size-3" />
-              +24 over 8 weeks
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <TrendChart data={improvementTrend} color="var(--chart-5)" height={224} />
+          <CardContent className="p-6 text-center text-red-500">
+            {error}
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* Game history */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Game History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Desktop table */}
-          <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="pb-3 font-medium">Game</th>
-                  <th className="pb-3 font-medium">Skill</th>
-                  <th className="pb-3 font-medium">Difficulty</th>
-                  <th className="pb-3 text-right font-medium">Score</th>
-                  <th className="pb-3 text-right font-medium">Accuracy</th>
-                  <th className="pb-3 text-right font-medium">Duration</th>
-                  <th className="pb-3 text-right font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {gameHistory.map((h) => (
-                  <tr key={h.id}>
-                    <td className="py-3 font-medium">{h.game}</td>
-                    <td className="py-3 text-muted-foreground">{h.skill}</td>
-                    <td className="py-3">
-                      <Badge variant={difficultyVariant[h.difficulty]}>{h.difficulty}</Badge>
-                    </td>
-                    <td className="py-3 text-right font-semibold tabular-nums">{h.score}</td>
-                    <td className="py-3 text-right tabular-nums text-muted-foreground">
-                      {h.accuracy}%
-                    </td>
-                    <td className="py-3 text-right tabular-nums text-muted-foreground">
-                      {h.duration}
-                    </td>
-                    <td className="py-3 text-right text-muted-foreground">{h.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {!loading && !error && (
+        <>
+          {/* Progress Summary */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Games Played
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold">{gamesPlayed}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Average Score
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {averageScore.toFixed(0)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Best Score
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold">{bestScore}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Average Accuracy
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {averageAccuracy.toFixed(0)}%
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Mobile cards */}
-          <ul className="flex flex-col divide-y divide-border sm:hidden">
-            {gameHistory.map((h) => {
-              const Icon = skillMeta[h.skill].icon
-              return (
-                <li key={h.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <span
-                    className="flex size-9 shrink-0 items-center justify-center rounded-xl"
-                    style={{
-                      backgroundColor: `color-mix(in oklab, ${skillMeta[h.skill].color} 15%, transparent)`,
-                      color: skillMeta[h.skill].color,
-                    }}
-                  >
-                    <Icon className="size-[18px]" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{h.game}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {h.accuracy}% · {h.duration} · {h.date}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums">{h.score}</span>
-                </li>
-              )
-            })}
-          </ul>
-        </CardContent>
-      </Card>
+          {/* Time + Status */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Total Time Played</CardTitle>
 
-      {/* Achievements */}
-      <div>
-        <h2 className="mb-4 font-display text-lg font-semibold tracking-tight">
-          Achievement Badges
-        </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {achievements.map((a) => (
-            <AchievementBadge key={a.id} achievement={a} />
-          ))}
-        </div>
-      </div>
+                <Badge variant="muted">
+                  <Clock className="size-3" />
+                  All time
+                </Badge>
+              </CardHeader>
+
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {totalTime.toFixed(0)} sec
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Total time spent playing cognitive games.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Progress Status</CardTitle>
+
+                <TrendingUp className="size-5 text-muted-foreground" />
+              </CardHeader>
+
+              <CardContent>
+                {gamesPlayed === 0 ? (
+                  <>
+                    <p className="text-xl font-semibold">
+                      No games played yet
+                    </p>
+
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Play your first cognitive game to start building your
+                      progress.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xl font-semibold">
+                      Keep going!
+                    </p>
+
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      You have completed {gamesPlayed}{" "}
+                      {gamesPlayed === 1 ? "game" : "games"}.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Empty Game History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Game History</CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {gamesPlayed === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="font-medium">
+                    No game history yet
+                  </p>
+
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your game results will appear here after you play a
+                    cognitive game.
+                  </p>
+                </div>
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="font-medium">
+                    {gamesPlayed} {gamesPlayed === 1 ? "game" : "games"} played
+                  </p>
+
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your overall performance is shown above.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
-  )
+  );
 }

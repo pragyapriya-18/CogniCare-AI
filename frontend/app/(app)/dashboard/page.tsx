@@ -1,6 +1,8 @@
 "use client";
-import Link from 'next/link'
-import * as React from 'react'
+
+import Link from "next/link";
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Brain,
   Flame,
@@ -10,40 +12,83 @@ import {
   ArrowRight,
   Clock,
   Sparkles,
-} from 'lucide-react'
-import { PageHeader } from '@/components/page-header'
-import { StatCard } from '@/components/stat-card'
-import { SkillScoreCard } from '@/components/skill-score-card'
-import { RecentActivity } from '@/components/recent-activity'
-import { BarChart, RadialScore } from '@/components/charts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+} from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
+import { SkillScoreCard } from "@/components/skill-score-card";
+import { RecentActivity } from "@/components/recent-activity";
+import { BarChart, RadialScore } from "@/components/charts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { VoiceInput } from "@/components/VoiceInput";
+import { speak } from "@/lib/voice";
 import {
-
   dashboardStats,
   cognitiveScores,
   weeklyPerformance,
   games,
-} from '@/lib/mock-data'
+} from "@/lib/mock-data";
 
 export default function DashboardPage() {
-  const [userName, setUserName] = React.useState('User')
+  const router = useRouter();
+  const [userName, setUserName] = React.useState("User");
+  const [voiceText, setVoiceText] = React.useState("");
 
   React.useEffect(() => {
-    const savedUser = localStorage.getItem('user')
+    const savedUser = localStorage.getItem("user");
 
     if (savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser)
-        setUserName(parsedUser.name || parsedUser.firstName || 'User')
+        const parsedUser = JSON.parse(savedUser);
+        setUserName(parsedUser.name || parsedUser.firstName || "User");
       } catch {
-        setUserName('User')
+        setUserName("User");
       }
     }
-  }, [])
-  const recommended = games[2]
-  const RecIcon = recommended.icon
+  }, []);
+
+  const [reminders, setReminders] = React.useState({
+  medicine: false,
+  water: false,
+});
+
+const handleVoiceInput = (transcript: string) => {
+  const lower = transcript.toLowerCase();
+  setVoiceText(transcript);
+
+  // 1. Navigation Actions
+  if (lower.includes("game") || lower.includes("play") || lower.includes("match")) {
+    speak("Starting your memory exercise.", "en-IN");
+    router.push("/games/memory-match");
+    return;
+  }
+
+  if (lower.includes("progress") || lower.includes("score") || lower.includes("report")) {
+    speak("Opening your cognitive progress report.", "en-IN");
+    router.push("/progress");
+    return;
+  }
+
+  // 2. Health & Routine Tracking (Saves state for caregivers)
+  if (lower.includes("medicine") || lower.includes("pill") || lower.includes("dawa")) {
+    setReminders((prev) => ({ ...prev, medicine: true }));
+    speak("I have recorded that you took your medicine. Well done.", "en-IN");
+    return;
+  }
+
+  if (lower.includes("water") || lower.includes("pani")) {
+    setReminders((prev) => ({ ...prev, water: true }));
+    speak("Hydration logged. Remember to drink water regularly.", "en-IN");
+    return;
+  }
+
+  // 3. Fallback Conversational Response
+  speak(`I heard: ${transcript}. You can ask to play a game or log your medicine.`, "en-IN");
+};
+
+  const recommended = games[2];
+  const RecIcon = recommended.icon;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 lg:p-8">
@@ -51,12 +96,27 @@ export default function DashboardPage() {
         title={`Welcome back, ${userName}`}
         description="Here's your cognitive training snapshot. Keep the momentum going today."
         actions={
-          <Button render={<Link href="/games/memory-match" />}>
-            <Play className="size-4" />
-            Start Game
-          </Button>
+          <div className="flex items-center gap-3">
+            <VoiceInput onTranscript={handleVoiceInput} />
+            <Button render={<Link href="/games/memory-match" />}>
+              <Play className="size-4" />
+              Start Game
+            </Button>
+          </div>
         }
       />
+
+      {/* Recognized text banner */}
+      {voiceText && (
+        <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 flex items-center justify-between">
+          <p className="text-sm font-medium">
+            🎤 <strong>Recognized:</strong> &quot;{voiceText}&quot;
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => setVoiceText("")}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -92,7 +152,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Cognitive score overview */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Cognitive Score</CardTitle>
@@ -115,7 +174,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Weekly performance */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Weekly Performance</CardTitle>
@@ -135,7 +193,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Skill breakdown */}
       <div>
         <h2 className="mb-4 font-display text-lg font-semibold tracking-tight">Skill Breakdown</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -146,7 +203,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recommended game */}
         <Card className="relative overflow-hidden border-none bg-gradient-to-br from-primary to-chart-5 text-primary-foreground lg:col-span-1">
           <div
             aria-hidden
@@ -175,7 +231,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent activity */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Recent Activity</CardTitle>
@@ -190,5 +245,5 @@ export default function DashboardPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from database import get_db_connection, create_tables
 from auth import register, login
@@ -7,6 +7,7 @@ from reminders import create_reminder, get_reminders, update_reminder, delete_re
 from caregiver import get_patient_info, get_patient_progress
 from difficulty import submit_performance, get_performance_history, set_difficulty, get_difficulty
 from progress import get_progress
+from adaptive_model import predict_difficulty
 
 app = Flask(__name__)
 CORS(app)
@@ -103,7 +104,34 @@ def fetch_difficulty(user_id, game_name):
     return get_difficulty(user_id, game_name)
 
 
+# ---------------- ADAPTIVE AI ----------------
+
+@app.route("/api/difficulty/predict", methods=["POST"])
+def predict_next_difficulty():
+    data = request.get_json()
+
+    accuracy = data.get("accuracy")
+    score = data.get("score")
+    time_taken = data.get("time_taken")
+
+    if accuracy is None or score is None or time_taken is None:
+        return jsonify({
+            "error": "accuracy, score and time_taken are required"
+        }), 400
+
+    difficulty = predict_difficulty(
+        accuracy,
+        score,
+        time_taken
+    )
+
+    return jsonify({
+        "predicted_difficulty": difficulty
+    }), 200
+
 # ---------------- RUN SERVER ----------------
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)

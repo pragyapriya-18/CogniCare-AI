@@ -30,9 +30,9 @@ export default function NumberRecallPage() {
   const [score, setScore] = React.useState(0);
   const [message, setMessage] = React.useState("Press Start to begin");
 
-const [finalScore, setFinalScore] = React.useState(0);
-const responseTimes = React.useRef<number[]>([]);
-const responseStartTime = React.useRef<number | null>(null);
+  const [finalScore, setFinalScore] = React.useState(0);
+  const responseTimes = React.useRef<number[]>([]);
+  const responseStartTime = React.useRef<number | null>(null);
 
   const current = settings[difficulty];
 
@@ -44,58 +44,95 @@ const responseStartTime = React.useRef<number | null>(null);
     }
   }, []);
 
-  // AI -> predict next difficulty
-React.useEffect(() => {
-  if (!finished) return
+  // Save score to backend -> then AI predicts next difficulty
+  React.useEffect(() => {
+    if (!finished) return;
 
-  const accuracy = Math.round(
-  (finalScore / (current.rounds * current.points)) * 100
-);
+    const accuracy = Math.round(
+      (finalScore / (current.rounds * current.points)) * 100
+    );
 
-const averageResponseTime =
-  responseTimes.current.length > 0
-    ? responseTimes.current.reduce((sum, time) => sum + time, 0) /
-      responseTimes.current.length
-    : 0;
-  const predictNextDifficulty = async () => {
+    const averageResponseTime =
+      responseTimes.current.length > 0
+        ? responseTimes.current.reduce((sum, time) => sum + time, 0) /
+          responseTimes.current.length
+        : 0;
 
-    console.log("AI INPUT:", {
-  accuracy,
-  score: accuracy,
-  time_taken: averageResponseTime,
-});
-
-    try {
-      const response = await fetch(
-        "https://cognicare-ai.onrender.com/api/difficulty/predict",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            accuracy: accuracy,
-            score: score,
-            time_taken: 0,
-          }),
+    const saveScore = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+          console.error("User not found in localStorage");
+          return;
         }
-      )
 
-      const data = await response.json()
+        const user = JSON.parse(storedUser);
 
-      console.log("AI predicted difficulty:", data.predicted_difficulty)
+        const response = await fetch(
+          "https://cognicare-ai.onrender.com/api/games/submit",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: user.id,
+              game_name: "number-recall",
+              score: finalScore,
+              accuracy: accuracy,
+              time_taken: averageResponseTime,
+            }),
+          }
+        );
 
-      localStorage.setItem(
-        "nextDifficulty",
-        data.predicted_difficulty
-      )
-    } catch (error) {
-      console.error("AI difficulty prediction failed:", error)
-    }
-  }
+        const data = await response.json();
 
-  predictNextDifficulty()
-}, [finished, score, current])
+        if (!response.ok) {
+          console.error("Backend error:", data);
+          return;
+        }
+
+        console.log("Score saved successfully:", data);
+      } catch (error) {
+        console.error("Failed to save score:", error);
+      }
+    };
+
+    saveScore();
+
+    const predictNextDifficulty = async () => {
+      console.log("AI INPUT:", {
+        accuracy,
+        score: finalScore,
+        time_taken: averageResponseTime,
+      });
+
+      try {
+        const response = await fetch(
+          "https://cognicare-ai.onrender.com/api/difficulty/predict",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              accuracy: accuracy,
+              score: finalScore,
+              time_taken: averageResponseTime,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        console.log("AI predicted difficulty:", data.predicted_difficulty);
+
+        localStorage.setItem("nextDifficulty", data.predicted_difficulty);
+      } catch (error) {
+        console.error("AI difficulty prediction failed:", error);
+      }
+    };
+
+    predictNextDifficulty();
+  }, [finished, score, current]);
 
   const startRound = () => {
     const newNumber = makeNumber(current.digits);
@@ -106,52 +143,53 @@ const averageResponseTime =
     setMessage("Remember the number!");
 
     setTimeout(() => {
-  setShowNumber(false);
-  setMessage("Enter the number");
-  responseStartTime.current = Date.now();
-}, current.time);
-
+      setShowNumber(false);
+      setMessage("Enter the number");
+      responseStartTime.current = Date.now();
+    }, current.time);
   };
-  const startGame = () => {
-  setStarted(true);
-  setFinished(false);
-  setRound(1);
-  setScore(0);
-  setFinalScore(0);
-  
-  responseTimes.current = [];
-  responseStartTime.current = null;
 
-  startRound();
-};
+  const startGame = () => {
+    setStarted(true);
+    setFinished(false);
+    setRound(1);
+    setScore(0);
+    setFinalScore(0);
+
+    responseTimes.current = [];
+    responseStartTime.current = null;
+
+    startRound();
+  };
+
   const submitAnswer = () => {
     if (!started || showNumber || !answer) return;
 
     const correct = answer === number;
 
     const elapsedTime = responseStartTime.current
-  ? (Date.now() - responseStartTime.current) / 1000
-  : 0;
+      ? (Date.now() - responseStartTime.current) / 1000
+      : 0;
 
-responseTimes.current.push(elapsedTime);
+    responseTimes.current.push(elapsedTime);
 
-    const newScore = correct
-  ? score + current.points
-  : score;
+    const newScore = correct ? score + current.points : score;
 
-setScore(newScore);
+    setScore(newScore);
 
-if (correct) {
-  setMessage("Correct! 🎉");
-} else {
-  setMessage(`Wrong! Answer was ${number}`);
-}
+    if (correct) {
+      setMessage("Correct! 🎉");
+    } else {
+      setMessage(`Wrong! Answer was ${number}`);
+    }
+
     if (round >= current.rounds) {
-  setFinalScore(newScore);
-  setFinished(true);
-  setStarted(false);
-  return;
-}
+      setFinalScore(newScore);
+      setFinished(true);
+      setStarted(false);
+      return;
+    }
+
     setTimeout(() => {
       setRound((prev) => prev + 1);
       startRound();
@@ -159,47 +197,49 @@ if (correct) {
   };
 
   const restart = () => {
-  setNumber("");
-  setAnswer("");
-  setShowNumber(false);
-  setStarted(false);
-  setFinished(false);
-  setRound(1);
-  setScore(0);
-  setFinalScore(0);
+    setNumber("");
+    setAnswer("");
+    setShowNumber(false);
+    setStarted(false);
+    setFinished(false);
+    setRound(1);
+    setScore(0);
+    setFinalScore(0);
 
-  responseTimes.current = [];
-  responseStartTime.current = null;
+    responseTimes.current = [];
+    responseStartTime.current = null;
 
-  setMessage("Press Start to begin");
-};
-    const playAgain = () => {
-  const savedDifficulty = localStorage.getItem("nextDifficulty");
+    setMessage("Press Start to begin");
+  };
 
-  const nextDifficulty = savedDifficulty?.toLowerCase();
+  const playAgain = () => {
+    const savedDifficulty = localStorage.getItem("nextDifficulty");
 
-  if (
-    nextDifficulty === "easy" ||
-    nextDifficulty === "medium" ||
-    nextDifficulty === "hard"
-  ) {
-    setDifficulty(nextDifficulty);
-  }
+    const nextDifficulty = savedDifficulty?.toLowerCase();
 
-  setNumber("");
-  setAnswer("");
-  setShowNumber(false);
-  setStarted(false);
-  setFinished(false);
-  setRound(1);
-setScore(0);
-setFinalScore(0);
+    if (
+      nextDifficulty === "easy" ||
+      nextDifficulty === "medium" ||
+      nextDifficulty === "hard"
+    ) {
+      setDifficulty(nextDifficulty);
+    }
 
-responseTimes.current = [];
-responseStartTime.current = null;
+    setNumber("");
+    setAnswer("");
+    setShowNumber(false);
+    setStarted(false);
+    setFinished(false);
+    setRound(1);
+    setScore(0);
+    setFinalScore(0);
 
-setMessage("Press Start to begin");
-};
+    responseTimes.current = [];
+    responseStartTime.current = null;
+
+    setMessage("Press Start to begin");
+  };
+
   const changeDifficulty = (value: Difficulty) => {
     restart();
     setDifficulty(value);

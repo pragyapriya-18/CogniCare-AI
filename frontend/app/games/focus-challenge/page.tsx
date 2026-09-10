@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, RotateCcw, Trophy, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { submitGameScore, predictDifficulty } from "@/lib/api";
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -68,6 +69,39 @@ export default function FocusChallengePage() {
     }
   }, []);
 
+  React.useEffect(() => {
+  if (!finished) return;
+
+  const saveScore = async () => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        console.error("User not found in localStorage");
+        return;
+      }
+
+      const user = JSON.parse(storedUser);
+      const accuracy = Math.round((score / (currentSettings.rounds * currentSettings.points)) * 100);
+
+      const data = await submitGameScore(
+        user.id,
+        "focus-challenge",
+        score,
+        accuracy,
+        0 // no timer tracked in this game currently
+      );
+      console.log("Score saved successfully:", data);
+
+      const predictData = await predictDifficulty(accuracy, score, 0);
+      console.log("AI predicted difficulty:", predictData.predicted_difficulty);
+      localStorage.setItem("nextDifficulty", predictData.predicted_difficulty);
+    } catch (error) {
+      console.error("Failed to save score or predict difficulty:", error);
+    }
+  };
+
+  saveScore();
+}, [finished]);
   const startGame = () => {
     setScore(0);
     setRound(1);

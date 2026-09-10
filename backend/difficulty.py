@@ -149,6 +149,34 @@ def set_difficulty():
         cursor.close()
         connection.close()
 
+def predict_difficulty():
+    data = request.get_json()
+
+    accuracy = data.get("accuracy")
+    score = data.get("score")
+    time_taken = data.get("time_taken")
+
+    if accuracy is None or score is None:
+        return jsonify({
+            "error": "accuracy and score are required"
+        }), 400
+
+    # Simple rule-based prediction for now (placeholder until AI model is ready)
+    if accuracy >= 80:
+        predicted_difficulty = "hard"
+    elif accuracy >= 50:
+        predicted_difficulty = "medium"
+    else:
+        predicted_difficulty = "easy"
+
+    return jsonify({
+        "predicted_difficulty": predicted_difficulty,
+        "based_on": {
+            "accuracy": accuracy,
+            "score": score,
+            "time_taken": time_taken
+        }
+    }), 200
 
 def get_difficulty(user_id, game_name):
     connection = get_db_connection()

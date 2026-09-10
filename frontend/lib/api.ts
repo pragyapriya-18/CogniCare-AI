@@ -42,7 +42,41 @@ export async function getDifficulty(
     `/api/difficulty/${userId}/${encodeURIComponent(gameName)}`
   );
 }
+// Submit game score
+export async function submitGameScore(
+  userId: number,
+  gameName: string,
+  score: number,
+  accuracy: number,
+  timeTaken: number
+) {
+  return request("/api/games/submit", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      game_name: gameName,
+      score: score,
+      accuracy: accuracy,
+      time_taken: timeTaken,
+    }),
+  });
+}
 
+// Predict next difficulty
+export async function predictDifficulty(
+  accuracy: number,
+  score: number,
+  timeTaken: number
+) {
+  return request<{ predicted_difficulty: string }>("/api/difficulty/predict", {
+    method: "POST",
+    body: JSON.stringify({
+      accuracy: accuracy,
+      score: score,
+      time_taken: timeTaken,
+    }),
+  });
+}
 // Set difficulty
 export async function setDifficulty(
   userId: number,

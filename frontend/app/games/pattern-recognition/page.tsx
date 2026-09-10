@@ -4,8 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, RotateCcw, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cognicare-ai.onrender.com'
 
 const patterns = [
   {

@@ -5,7 +5,7 @@ from auth import register, login
 from games import submit_score, get_user_scores
 from reminders import create_reminder, get_reminders, update_reminder, delete_reminder
 from caregiver import get_patient_info, get_patient_progress
-from difficulty import submit_performance, get_performance_history, set_difficulty, get_difficulty
+from difficulty import submit_performance, get_performance_history, set_difficulty, get_difficulty, predict_difficulty
 from progress import get_progress
 from adaptive_model import predict_difficulty
 
@@ -89,6 +89,9 @@ def fetch_performance_history(user_id):
 def update_difficulty():
     return set_difficulty()
 
+@app.route("/api/difficulty/predict", methods=["POST"])
+def predict_game_difficulty():
+    return predict_difficulty()
 
 @app.route("/api/difficulty/<int:user_id>/<game_name>", methods=["GET"])
 def fetch_difficulty(user_id, game_name):

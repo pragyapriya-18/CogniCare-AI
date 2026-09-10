@@ -131,14 +131,23 @@ React.useEffect(() => {
 
   const saveScore = async () => {
     try {
+      const storedUser = localStorage.getItem('user')
+
+      if (!storedUser) {
+        console.error('User not found in localStorage')
+        return
+      }
+
+      const user = JSON.parse(storedUser)
+
       const response = await fetch(`${API_URL}/api/games/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: 1,
-          game_name: 'Memory Match',
+          user_id: user.id,
+          game_name: 'memory-match',
           score: score,
           accuracy: accuracy,
           time_taken: seconds,
@@ -162,14 +171,12 @@ React.useEffect(() => {
 
   const t = setTimeout(() => {
     router.push(
-      `/results?score=${score}&time=${seconds}&moves=${moves}&accuracy=${accuracy}`,
+      `/results?score=${score}&time=${seconds}&moves=${moves}&accuracy=${accuracy}`
     )
   }, 900)
 
   return () => clearTimeout(t)
 }, [won, router, score, seconds, moves, totalPairs])
-
-
 // AI -> predict next difficulty
 React.useEffect(() => {
   if (!won) return
@@ -210,6 +217,8 @@ React.useEffect(() => {
 
   predictNextDifficulty()
 }, [won, score, seconds, moves, totalPairs])
+
+
 
 
   const handleFlip = (index: number) => {

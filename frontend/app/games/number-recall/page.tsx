@@ -67,7 +67,7 @@ const averageResponseTime =
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:5000/api/difficulty/predict",
+        "https://cognicare-ai.onrender.com/api/difficulty/predict",
         {
           method: "POST",
           headers: {

@@ -4,6 +4,8 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Play, RotateCcw, Trophy, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000'
 
 const COLORS = [
   'bg-red-500',
@@ -34,6 +36,8 @@ export default function SequenceRecallPage() {
   const [message, setMessage] = React.useState('Press Start to begin')
   const [active, setActive] = React.useState<number | null>(null)
   const [finished, setFinished] = React.useState(false)
+  const [startTime, setStartTime] = React.useState<number | null>(null)
+const [score, setScore] = React.useState(0)
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -49,9 +53,12 @@ export default function SequenceRecallPage() {
   const maxLength = MAX_LENGTH[difficulty]
 
   const startGame = () => {
-    const firstSequence = [Math.floor(Math.random() * 4)]
+  const firstSequence = [Math.floor(Math.random() * 4)]
 
-    setSequence(firstSequence)
+  setStartTime(Date.now())
+  setScore(0)
+
+  setSequence(firstSequence)
     setUserSequence([])
     setRound(1)
     setStarted(true)
@@ -59,6 +66,47 @@ export default function SequenceRecallPage() {
     setMessage('Watch the sequence carefully')
     showSequence(firstSequence)
   }
+  const saveScore = async (finalScore: number, finalAccuracy: number) => {
+  try {
+    const storedUser = localStorage.getItem('user')
+
+    if (!storedUser) {
+      console.error('User not found in localStorage')
+      return
+    }
+
+    const user = JSON.parse(storedUser)
+
+    const timeTaken = startTime
+      ? Math.round((Date.now() - startTime) / 1000)
+      : 0
+
+    const response = await fetch(`${API_URL}/api/games/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        game_name: 'sequence-recall',
+        score: finalScore,
+        accuracy: finalAccuracy,
+        time_taken: timeTaken,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error('Backend error:', data)
+      return
+    }
+
+    console.log('Sequence Recall score saved successfully:', data)
+  } catch (error) {
+    console.error('Failed to connect to backend:', error)
+  }
+}
 
   const showSequence = (seq: number[]) => {
     setShowing(true)
@@ -88,19 +136,38 @@ export default function SequenceRecallPage() {
     const currentIndex = nextUserSequence.length - 1
 
     if (color !== sequence[currentIndex]) {
-      setMessage('Wrong sequence! Game Over.')
-      setStarted(false)
-      setFinished(true)
-      return
-    }
+  const correctInputs = nextUserSequence.length - 1
+  const totalInputs = nextUserSequence.length
+
+  const finalAccuracy =
+    totalInputs > 0
+      ? Math.round((correctInputs / totalInputs) * 100)
+      : 0
+
+  const finalScore = Math.max((sequence.length - 1) * 100, 0)
+
+  setScore(finalScore)
+  setMessage('Wrong sequence! Game Over.')
+  setStarted(false)
+  setFinished(true)
+
+  saveScore(finalScore, finalAccuracy)
+  return
+}
 
     if (nextUserSequence.length === sequence.length) {
       if (sequence.length >= maxLength) {
-        setMessage('Excellent! You completed this difficulty.')
-        setStarted(false)
-        setFinished(true)
-        return
-      }
+  const finalScore = maxLength * 100
+  const finalAccuracy = 100
+
+  setScore(finalScore)
+  setMessage('Excellent! You completed this difficulty.')
+  setStarted(false)
+  setFinished(true)
+
+  saveScore(finalScore, finalAccuracy)
+  return
+}
 
       const nextRound = round + 1
 
@@ -129,6 +196,8 @@ export default function SequenceRecallPage() {
     setRound(1)
     setActive(null)
     setFinished(false)
+    setStartTime(null)
+setScore(0)
     setMessage('Press Start to begin')
   }
 

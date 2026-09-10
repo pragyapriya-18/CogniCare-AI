@@ -10,3 +10,15 @@ frontend/.next/
 .env
 .env.local
 .env.*.local
+backend/venv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
+backend/.env
+.env
+frontend/node_modules/
+node_modules/
+frontend/.next/
+.next/

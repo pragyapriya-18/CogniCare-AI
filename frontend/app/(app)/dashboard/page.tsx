@@ -1,5 +1,8 @@
 'use client'
 
+import { VoiceInput } from "@/components/VoiceInput";
+import { speak } from "@/lib/voice";
+import { useRouter } from "next/navigation";
 import Link from 'next/link'
 import * as React from 'react'
 import {
@@ -169,12 +172,41 @@ function getGameTitle(gameName: string) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [userName, setUserName] = React.useState('User')
+  const [voiceText, setVoiceText] = React.useState('')
   const [scores, setScores] = React.useState<Score[]>([])
   const [loading, setLoading] = React.useState(true)
 
+  const handleVoiceInput = (transcript: string) => {
+    const lower = transcript.toLowerCase()
+    setVoiceText(transcript)
+
+    // Voice Navigation
+    if (lower.includes("game") || lower.includes("play") || lower.includes("start")) {
+      speak("Starting Memory Match game.", "en-IN")
+      router.push("/games/memory-match")
+      return
+    }
+
+    if (lower.includes("progress") || lower.includes("score") || lower.includes("report")) {
+      speak("Opening your progress report.", "en-IN")
+      router.push("/progress")
+      return
+    }
+
+    // Health & Routine check
+    if (lower.includes("water") || lower.includes("medicine")) {
+      speak("I have recorded your daily check.", "en-IN")
+      return
+    }
+
+    // Fallback response
+    speak(`I heard: ${transcript}`, "en-IN")
+  }
+
   React.useEffect(() => {
-    const savedUser = localStorage.getItem("user");
+    const savedUser = localStorage.getItem("user")
 
     if (!savedUser) {
       setLoading(false)
@@ -396,12 +428,12 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-56">
               <BarChart 
-  data={weeklyScores.map((d) => ({
-    label: d.day,
-    value: d.score,
-  }))}
-  color="var(--chart-1)" 
-/>
+                data={weeklyScores.map((d) => ({
+                  label: d.day,
+                  value: d.score,
+                }))}
+                color="var(--chart-1)" 
+              />
             </div>
           </CardContent>
         </Card>

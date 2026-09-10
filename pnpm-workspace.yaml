@@ -1,6 +1,6 @@
 packages:
-  - "frontend"
+  - 'frontend'
 
 minimumReleaseAgeExclude:
-  - "@next/*"
+  - '@next/*'
   - next

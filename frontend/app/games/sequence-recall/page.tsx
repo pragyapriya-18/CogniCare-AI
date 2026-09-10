@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Play, RotateCcw, Trophy, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000'
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cognicare-ai.onrender.com'
 
 const COLORS = [
   'bg-red-500',

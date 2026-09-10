@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RotateCcw, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://cognicare-ai.onrender.com";
+
 type Difficulty = "easy" | "medium" | "hard";
 
 const settings = {
@@ -28,23 +31,35 @@ export default function NumberRecallPage() {
   const [finished, setFinished] = React.useState(false);
   const [round, setRound] = React.useState(1);
   const [score, setScore] = React.useState(0);
+  const [finalScore, setFinalScore] = React.useState(0);
   const [message, setMessage] = React.useState("Press Start to begin");
 
-  const [finalScore, setFinalScore] = React.useState(0);
   const responseTimes = React.useRef<number[]>([]);
   const responseStartTime = React.useRef<number | null>(null);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   const current = settings[difficulty];
 
+  // Initialize difficulty from query param or localStorage
   React.useEffect(() => {
-    const value = new URLSearchParams(window.location.search).get("difficulty");
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("difficulty");
+    const saved = localStorage.getItem("nextDifficulty");
+    const chosen = (value || saved || "easy").toLowerCase();
 
-    if (value === "medium" || value === "hard") {
-      setDifficulty(value);
+    if (chosen === "medium" || chosen === "hard") {
+      setDifficulty(chosen);
     }
   }, []);
 
-  // Save score to backend -> then AI predicts next difficulty
+  // Auto-focus input when the number disappears
+  React.useEffect(() => {
+    if (started && !showNumber && !finished) {
+      inputRef.current?.focus();
+    }
+  }, [started, showNumber, finished]);
+
+  // Handle Game Completion, Score Submission, and Prediction
   React.useEffect(() => {
     if (!finished) return;
 
@@ -58,115 +73,89 @@ export default function NumberRecallPage() {
           responseTimes.current.length
         : 0;
 
-    const saveScore = async () => {
+    const processGameEnd = async () => {
       try {
         const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-          console.error("User not found in localStorage");
-          return;
-        }
+        const user = storedUser ? JSON.parse(storedUser) : null;
 
-        const user = JSON.parse(storedUser);
+        const payload = {
+          accuracy,
+          score: finalScore,
+          time_taken: Number(averageResponseTime.toFixed(3)),
+        };
 
-        const response = await fetch(
-          "https://cognicare-ai.onrender.com/api/games/submit",
-          {
+        const promises: Promise<any>[] = [
+          fetch(`${API_URL}/api/difficulty/predict`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: user.id,
-              game_name: "number-recall",
-              score: finalScore,
-              accuracy: accuracy,
-              time_taken: averageResponseTime,
+            body: JSON.stringify(payload),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.predicted_difficulty) {
+                localStorage.setItem("nextDifficulty", data.predicted_difficulty);
+              }
             }),
-          }
-        );
+        ];
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          console.error("Backend error:", data);
-          return;
+        if (user?.id) {
+          promises.push(
+            fetch(`${API_URL}/api/games/submit`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                user_id: user.id,
+                game_name: "number-recall",
+                ...payload,
+              }),
+            })
+          );
         }
 
-        console.log("Score saved successfully:", data);
-      } catch (error) {
-        console.error("Failed to save score:", error);
+        await Promise.allSettled(promises);
+      } catch (err) {
+        console.error("Game completion sync failed:", err);
       }
     };
 
-    saveScore();
+    processGameEnd();
+  }, [finished, finalScore, current.rounds, current.points]);
 
-    const predictNextDifficulty = async () => {
-      console.log("AI INPUT:", {
-        accuracy,
-        score: finalScore,
-        time_taken: averageResponseTime,
-      });
+  const startRound = React.useCallback(
+    (targetDifficulty: Difficulty = difficulty) => {
+      const activeSettings = settings[targetDifficulty];
+      const newNumber = makeNumber(activeSettings.digits);
 
-      try {
-        const response = await fetch(
-          "https://cognicare-ai.onrender.com/api/difficulty/predict",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              accuracy: accuracy,
-              score: finalScore,
-              time_taken: averageResponseTime,
-            }),
-          }
-        );
+      setNumber(newNumber);
+      setAnswer("");
+      setShowNumber(true);
+      setMessage("Remember the number!");
 
-        const data = await response.json();
+      setTimeout(() => {
+        setShowNumber(false);
+        setMessage("Enter the number");
+        responseStartTime.current = Date.now();
+      }, activeSettings.time);
+    },
+    [difficulty]
+  );
 
-        console.log("AI predicted difficulty:", data.predicted_difficulty);
-
-        localStorage.setItem("nextDifficulty", data.predicted_difficulty);
-      } catch (error) {
-        console.error("AI difficulty prediction failed:", error);
-      }
-    };
-
-    predictNextDifficulty();
-  }, [finished, score, current]);
-
-  const startRound = () => {
-    const newNumber = makeNumber(current.digits);
-
-    setNumber(newNumber);
-    setAnswer("");
-    setShowNumber(true);
-    setMessage("Remember the number!");
-
-    setTimeout(() => {
-      setShowNumber(false);
-      setMessage("Enter the number");
-      responseStartTime.current = Date.now();
-    }, current.time);
-  };
-
-  const startGame = () => {
+  const startGame = (targetDifficulty: Difficulty = difficulty) => {
     setStarted(true);
     setFinished(false);
     setRound(1);
     setScore(0);
     setFinalScore(0);
-
     responseTimes.current = [];
     responseStartTime.current = null;
 
-    startRound();
+    startRound(targetDifficulty);
   };
 
   const submitAnswer = () => {
     if (!started || showNumber || !answer) return;
 
     const correct = answer === number;
-
     const elapsedTime = responseStartTime.current
       ? (Date.now() - responseStartTime.current) / 1000
       : 0;
@@ -174,7 +163,6 @@ export default function NumberRecallPage() {
     responseTimes.current.push(elapsedTime);
 
     const newScore = correct ? score + current.points : score;
-
     setScore(newScore);
 
     if (correct) {
@@ -205,44 +193,24 @@ export default function NumberRecallPage() {
     setRound(1);
     setScore(0);
     setFinalScore(0);
-
     responseTimes.current = [];
     responseStartTime.current = null;
-
     setMessage("Press Start to begin");
   };
 
   const playAgain = () => {
     const savedDifficulty = localStorage.getItem("nextDifficulty");
+    const nextDiff = (savedDifficulty || difficulty).toLowerCase() as Difficulty;
+    const validDiff =
+      nextDiff === "medium" || nextDiff === "hard" ? nextDiff : "easy";
 
-    const nextDifficulty = savedDifficulty?.toLowerCase();
-
-    if (
-      nextDifficulty === "easy" ||
-      nextDifficulty === "medium" ||
-      nextDifficulty === "hard"
-    ) {
-      setDifficulty(nextDifficulty);
-    }
-
-    setNumber("");
-    setAnswer("");
-    setShowNumber(false);
-    setStarted(false);
-    setFinished(false);
-    setRound(1);
-    setScore(0);
-    setFinalScore(0);
-
-    responseTimes.current = [];
-    responseStartTime.current = null;
-
-    setMessage("Press Start to begin");
+    setDifficulty(validDiff);
+    startGame(validDiff);
   };
 
   const changeDifficulty = (value: Difficulty) => {
-    restart();
     setDifficulty(value);
+    restart();
   };
 
   return (
@@ -268,26 +236,15 @@ export default function NumberRecallPage() {
         </div>
 
         <div className="mb-6 flex justify-center gap-2">
-          <Button
-            variant={difficulty === "easy" ? "default" : "outline"}
-            onClick={() => changeDifficulty("easy")}
-          >
-            Easy
-          </Button>
-
-          <Button
-            variant={difficulty === "medium" ? "default" : "outline"}
-            onClick={() => changeDifficulty("medium")}
-          >
-            Medium
-          </Button>
-
-          <Button
-            variant={difficulty === "hard" ? "default" : "outline"}
-            onClick={() => changeDifficulty("hard")}
-          >
-            Hard
-          </Button>
+          {(["easy", "medium", "hard"] as Difficulty[]).map((level) => (
+            <Button
+              key={level}
+              variant={difficulty === level ? "default" : "outline"}
+              onClick={() => changeDifficulty(level)}
+            >
+              <span className="capitalize">{level}</span>
+            </Button>
+          ))}
         </div>
 
         <div className="rounded-3xl border bg-card p-6 shadow-sm">
@@ -315,18 +272,20 @@ export default function NumberRecallPage() {
           {started && !finished && !showNumber && (
             <div className="mx-auto mt-6 flex max-w-md flex-col gap-3">
               <input
+                ref={inputRef}
                 value={answer}
                 onChange={(e) =>
                   setAnswer(e.target.value.replace(/\D/g, ""))
                 }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") submitAnswer();
+                  if (e.key === "Enter" && answer.length === current.digits) {
+                    submitAnswer();
+                  }
                 }}
                 maxLength={current.digits}
                 inputMode="numeric"
                 placeholder="Enter the number"
                 className="h-14 rounded-xl border bg-background px-4 text-center text-2xl font-semibold tracking-widest outline-none focus:ring-2 focus:ring-primary"
-                autoFocus
               />
 
               <Button
@@ -341,13 +300,13 @@ export default function NumberRecallPage() {
 
           <div className="mt-8 flex justify-center gap-3">
             {!started && !finished && (
-              <Button size="lg" onClick={startGame}>
+              <Button size="lg" onClick={() => startGame(difficulty)}>
                 Start Game
               </Button>
             )}
 
             {started && !finished && (
-              <Button variant="outline" onClick={playAgain}>
+              <Button variant="outline" onClick={restart}>
                 <RotateCcw className="mr-2 size-4" />
                 Restart
               </Button>
@@ -356,13 +315,8 @@ export default function NumberRecallPage() {
 
           {finished && (
             <div className="mt-8 text-center">
-              <h2 className="text-2xl font-bold">
-                Challenge Complete! 🎉
-              </h2>
-
-              <p className="mt-2 text-3xl font-bold">
-                Score: {score}
-              </p>
+              <h2 className="text-2xl font-bold">Challenge Complete! 🎉</h2>
+              <p className="mt-2 text-3xl font-bold">Score: {score}</p>
 
               <div className="mt-6 flex justify-center gap-3">
                 <Button onClick={playAgain}>
@@ -370,10 +324,7 @@ export default function NumberRecallPage() {
                   Play Again
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/games")}
-                >
+                <Button variant="outline" onClick={() => router.push("/games")}>
                   Back to Games
                 </Button>
               </div>
@@ -383,7 +334,6 @@ export default function NumberRecallPage() {
 
         <div className="mt-6 rounded-2xl border bg-card p-5">
           <h2 className="font-semibold">How to Play</h2>
-
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li>• Remember the number shown on screen.</li>
             <li>• Enter it after it disappears.</li>

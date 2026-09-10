@@ -22,3 +22,15 @@ frontend/node_modules/
 node_modules/
 frontend/.next/
 .next/
+backend/venv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
+backend/.env
+.env
+frontend/node_modules/
+node_modules/
+frontend/.next/
+.next/

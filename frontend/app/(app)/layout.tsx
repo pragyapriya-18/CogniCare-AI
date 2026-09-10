@@ -16,16 +16,13 @@ export default function AppGroupLayout({
   React.useEffect(() => {
     const user = localStorage.getItem("user");
 
-    const publicRoutes = ["/login", "/register"];
-    const isPublicRoute = publicRoutes.includes(pathname);
-
-    if (!user && !isPublicRoute) {
+    if (!user) {
       router.replace("/login");
       return;
     }
 
     setChecking(false);
-  }, [pathname, router]);
+  }, [router, pathname]);
 
   if (checking) {
     return null;

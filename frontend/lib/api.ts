@@ -1,5 +1,6 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://cognicare-ai.onrender.com";
 
 async function request<T>(
   endpoint: string,
@@ -23,33 +24,16 @@ async function request<T>(
 }
 
 // Progress
-type ProgressResponse = {
-  progress: {
-    average_accuracy: number;
-    average_score: number | string;
-    best_score: number;
-    games_played: number;
-    total_time: number;
-  };
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role?: string;
-  };
-};
-
-export async function getProgress(
-  userId: number
-): Promise<ProgressResponse> {
-  return request<ProgressResponse>(`/api/progress/${userId}`);
+export async function getProgress(userId: number) {
+  return request(`/api/progress/${userId}`);
 }
+
 // Difficulty performance
 export async function getDifficultyPerformance(userId: number) {
   return request(`/api/difficulty/performance/${userId}`);
 }
 
-// Get difficulty for a particular game
+// Get difficulty
 export async function getDifficulty(
   userId: number,
   gameName: string
@@ -59,7 +43,7 @@ export async function getDifficulty(
   );
 }
 
-// Set/update difficulty
+// Set difficulty
 export async function setDifficulty(
   userId: number,
   gameName: string,
@@ -98,6 +82,8 @@ export async function loginUser(
     }),
   });
 }
+
+// Register
 type RegisterResponse = {
   message: string;
 };

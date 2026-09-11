@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 type Setting = { id: string; icon: LucideIcon; label: string; description: string; default: boolean }
 
 const settings: Setting[] = [
-  { id: 'reminders', icon: Bell, label: 'Daily reminders', description: 'Get a nudge to keep your streak alive (coming soon)', default: true },
+  { id: 'reminders', icon: Bell, label: 'Daily reminders', description: 'Get a nudge to keep your streak alive  (coming soon)', default: true },
   { id: 'sound', icon: Volume2, label: 'Game sounds', description: 'Play audio cues during games (coming soon)', default: true },
   { id: 'darkmode', icon: Moon, label: 'Reduced motion', description: 'Minimize animations for comfort', default: false },
   { id: 'weekly', icon: Mail, label: 'Weekly report', description: 'Email me a summary of my progress (coming soon)', default: true },

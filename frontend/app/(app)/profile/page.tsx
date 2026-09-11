@@ -20,11 +20,142 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-import {
-  dashboardStats,
-  cognitiveScores,
-  achievements,
-} from '@/lib/mock-data'
+import { achievements } from '@/lib/mock-data'
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cognicare-ai.onrender.com'
+
+type Score = {
+  id: number
+  game_name: string
+  score: number
+  accuracy: number | null
+  time_taken: number | null
+  played_at: string
+}
+
+type ProgressResponse = {
+  user: {
+    id: number
+    name: string
+    email: string
+  }
+  progress: {
+    games_played: number
+    average_score: number
+    best_score: number
+    average_accuracy: number
+    total_time: number
+  }
+}
+
+type CognitiveSkill = 'Memory' | 'Attention' | 'Focus' | 'Reaction'
+
+const skillForGame: Record<string, CognitiveSkill> = {
+  'memory-match': 'Memory',
+  'sequence-recall': 'Memory',
+  'number-recall': 'Memory',
+  'pattern-recognition': 'Attention',
+  'focus-challenge': 'Focus',
+  'reaction-test': 'Reaction',
+}
+
+const skillLabels: CognitiveSkill[] = ['Memory', 'Attention', 'Focus', 'Reaction']
+
+function getSkillScore(scores: Score[], skill: CognitiveSkill) {
+  const skillScores = scores.filter((item) => skillForGame[item.game_name] === skill)
+
+  if (skillScores.length === 0) {
+    return 0
+  }
+
+  const total = skillScores.reduce((sum, item) => sum + (item.accuracy ?? 0), 0)
+
+  return Math.round(total / skillScores.length)
+}
+
+function getStreak(scores: Score[]) {
+  if (scores.length === 0) {
+    return 0
+  }
+
+  const dates = Array.from(
+    new Set(
+      scores.map((item) => {
+        const date = new Date(item.played_at)
+        return date.toISOString().slice(0, 10)
+      })
+    )
+  ).sort((a, b) => b.localeCompare(a))
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const latest = new Date(`${dates[0]}T00:00:00`)
+
+  const daysFromToday = Math.floor(
+    (today.getTime() - latest.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  if (daysFromToday > 1) {
+    return 0
+  }
+
+  let streak = 1
+
+  for (let i = 1; i < dates.length; i++) {
+    const current = new Date(`${dates[i - 1]}T00:00:00`)
+    const previous = new Date(`${dates[i]}T00:00:00`)
+
+    const difference = Math.floor(
+      (current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    if (difference === 1) {
+      streak++
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
+
+function getLongestStreak(scores: Score[]) {
+  if (scores.length === 0) {
+    return 0
+  }
+
+  const dates = Array.from(
+    new Set(
+      scores.map((item) => {
+        const date = new Date(item.played_at)
+        return date.toISOString().slice(0, 10)
+      })
+    )
+  ).sort((a, b) => a.localeCompare(b))
+
+  let longest = 1
+  let current = 1
+
+  for (let i = 1; i < dates.length; i++) {
+    const previous = new Date(`${dates[i - 1]}T00:00:00`)
+    const currentDate = new Date(`${dates[i]}T00:00:00`)
+
+    const difference = Math.floor(
+      (currentDate.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    if (difference === 1) {
+      current++
+      longest = Math.max(longest, current)
+    } else {
+      current = 1
+    }
+  }
+
+  return longest
+}
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = React.useState(false)
@@ -40,35 +171,79 @@ export default function ProfilePage() {
     plan: 'Free',
   })
 
+  const [scores, setScores] = React.useState<Score[]>([])
+  const [progress, setProgress] = React.useState<ProgressResponse['progress'] | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user')
 
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser)
-
-        const name = parsedUser.name || parsedUser.firstName || 'User'
-
-        const initials =
-          parsedUser.avatarInitials ||
-          name
-            .split(' ')
-            .map((word: string) => word[0])
-            .join('')
-            .slice(0, 2)
-            .toUpperCase()
-
-        setProfileUser({
-          name,
-          email: parsedUser.email || '',
-          avatarInitials: initials,
-          memberSince: parsedUser.memberSince || '',
-          plan: parsedUser.plan || 'Free',
-        })
-      } catch {
-        // Keep default profile data
-      }
+    if (!savedUser) {
+      setLoading(false)
+      return
     }
+
+    let parsedUser: any = null
+
+    try {
+      parsedUser = JSON.parse(savedUser)
+
+      const name = parsedUser.name || parsedUser.firstName || 'User'
+
+      const initials =
+        parsedUser.avatarInitials ||
+        name
+          .split(' ')
+          .map((word: string) => word[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase()
+
+      setProfileUser({
+        name,
+        email: parsedUser.email || '',
+        avatarInitials: initials,
+        memberSince: parsedUser.memberSince || '',
+        plan: parsedUser.plan || 'Free',
+      })
+    } catch {
+      setLoading(false)
+      return
+    }
+
+    if (!parsedUser?.id) {
+      setLoading(false)
+      return
+    }
+
+    Promise.all([
+      fetch(`${API_URL}/api/progress/${parsedUser.id}`),
+      fetch(`${API_URL}/api/games/scores/${parsedUser.id}`),
+    ])
+      .then(async ([progressResponse, scoresResponse]) => {
+        if (!progressResponse.ok || !scoresResponse.ok) {
+          throw new Error('Failed to load profile data')
+        }
+
+        const progressData = (await progressResponse.json()) as ProgressResponse
+        const scoresData = await scoresResponse.json()
+
+        setProfileUser((prev) => ({
+          ...prev,
+          name: progressData.user?.name || prev.name,
+        }))
+
+        setProgress(progressData.progress)
+        setScores(scoresData.scores || [])
+      })
+      .catch((err) => {
+        console.error('Profile fetch failed:', err)
+        setScores([])
+        setProgress(null)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
 
   const handleEdit = () => {
@@ -114,32 +289,49 @@ export default function ProfilePage() {
 
   const unlocked = achievements.filter((a) => a.unlocked)
 
+  const streak = getStreak(scores)
+  const longestStreak = getLongestStreak(scores)
+
+  const gamesPlayed = progress?.games_played ?? 0
+  const cognitiveScore = progress ? Math.round(progress.average_score) : 0
+  const minutesTrained = progress ? Math.round(progress.total_time / 60) : 0
+
   const summary = [
     {
       icon: Flame,
       label: 'Day Streak',
-      value: dashboardStats.streakDays,
+      value: streak,
       color: 'var(--chart-4)',
     },
     {
       icon: Gamepad2,
       label: 'Games Played',
-      value: dashboardStats.gamesCompleted,
+      value: gamesPlayed,
       color: 'var(--chart-3)',
     },
     {
       icon: Brain,
       label: 'Cognitive Score',
-      value: dashboardStats.cognitiveScore,
+      value: cognitiveScore,
       color: 'var(--chart-1)',
     },
     {
       icon: Clock,
       label: 'Minutes Trained',
-      value: dashboardStats.minutesTrained,
+      value: minutesTrained,
       color: 'var(--chart-5)',
     },
   ]
+
+  const skillScores = skillLabels.map((skill) => ({
+    skill,
+    score: getSkillScore(scores, skill),
+    delta: 0,
+  }))
+
+  if (loading) {
+    return null
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 lg:p-8">
@@ -291,7 +483,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {cognitiveScores.map((s) => (
+            {skillScores.map((s) => (
               <SkillScoreCard
                 key={s.skill}
                 skill={s.skill}
@@ -310,7 +502,7 @@ export default function ProfilePage() {
             </span>
 
             <p className="mt-4 font-display text-4xl font-bold">
-              {dashboardStats.streakDays}
+              {streak}
             </p>
 
             <p className="text-sm font-medium">
@@ -318,7 +510,9 @@ export default function ProfilePage() {
             </p>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Your longest streak is 21 days. Play today to keep it growing!
+              {longestStreak > 0
+                ? `Your longest streak is ${longestStreak} days. Play today to keep it growing!`
+                : 'Play today to start your streak!'}
             </p>
           </CardContent>
         </Card>

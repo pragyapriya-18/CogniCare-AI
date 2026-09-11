@@ -19,6 +19,9 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cognicare-ai.onrender.com'
+
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/games', label: 'Games', icon: Gamepad2 },
@@ -32,6 +35,57 @@ type LoggedInUser = {
   firstName?: string
   email?: string
   role?: string
+}
+
+type Score = {
+  played_at: string
+}
+
+function getStreak(scores: Score[]) {
+  if (scores.length === 0) {
+    return 0
+  }
+
+  const dates = Array.from(
+    new Set(
+      scores.map((item) => {
+        const date = new Date(item.played_at)
+        return date.toISOString().slice(0, 10)
+      })
+    )
+  ).sort((a, b) => b.localeCompare(a))
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const latest = new Date(`${dates[0]}T00:00:00`)
+
+  const daysFromToday = Math.floor(
+    (today.getTime() - latest.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  if (daysFromToday > 1) {
+    return 0
+  }
+
+  let streak = 1
+
+  for (let i = 1; i < dates.length; i++) {
+    const current = new Date(`${dates[i - 1]}T00:00:00`)
+    const previous = new Date(`${dates[i]}T00:00:00`)
+
+    const difference = Math.floor(
+      (current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    if (difference === 1) {
+      streak++
+    } else {
+      break
+    }
+  }
+
+  return streak
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -66,16 +120,18 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function StreakCard() {
+function StreakCard({ streak }: { streak: number }) {
   return (
     <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 to-chart-5/10 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold">
         <Flame className="size-4 text-warning" />
-        0-day streak
+        {streak}-day streak
       </div>
 
       <p className="mt-1 text-xs text-muted-foreground">
-        Start training daily to build your streak.
+        {streak > 0
+          ? 'Keep it going — play today!'
+          : 'Start training daily to build your streak.'}
       </p>
 
       <Button
@@ -100,6 +156,8 @@ function SidebarContent({
   const [currentUser, setCurrentUser] =
     React.useState<LoggedInUser | null>(null)
 
+  const [streak, setStreak] = React.useState(0)
+
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user')
 
@@ -108,12 +166,32 @@ function SidebarContent({
       return
     }
 
+    let parsedUser: LoggedInUser | null = null
+
     try {
-      const parsedUser = JSON.parse(savedUser)
+      parsedUser = JSON.parse(savedUser)
       setCurrentUser(parsedUser)
     } catch {
       setCurrentUser(null)
+      return
     }
+
+    if (!parsedUser?.id) {
+      return
+    }
+
+    fetch(`${API_URL}/api/games/scores/${parsedUser.id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch scores')
+        return res.json()
+      })
+      .then((data) => {
+        setStreak(getStreak(data.scores || []))
+      })
+      .catch((err) => {
+        console.error('Streak fetch failed:', err)
+        setStreak(0)
+      })
   }, [])
 
   const handleLogout = () => {
@@ -147,7 +225,7 @@ function SidebarContent({
         <NavLinks onNavigate={onNavigate} />
       </div>
 
-      <StreakCard />
+      <StreakCard streak={streak} />
 
       <div className="flex items-center gap-3 rounded-2xl border border-border p-3">
         <button

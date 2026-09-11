@@ -5,9 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RotateCcw, Trophy, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://cognicare-ai.onrender.com";
-
 type Difficulty = "easy" | "medium" | "hard";
 
 const settings = {
@@ -34,7 +31,9 @@ const settings = {
 export default function ReactionTestPage() {
   const router = useRouter();
 
-  const [difficulty, setDifficulty] = React.useState<Difficulty>("easy");
+  const [difficulty, setDifficulty] =
+    React.useState<Difficulty>("easy");
+
   const [started, setStarted] = React.useState(false);
   const [finished, setFinished] = React.useState(false);
   const [waiting, setWaiting] = React.useState(false);
@@ -44,146 +43,185 @@ export default function ReactionTestPage() {
   const [score, setScore] = React.useState(0);
   const [lastTime, setLastTime] = React.useState<number | null>(null);
   const [times, setTimes] = React.useState<number[]>([]);
-  const [finalScore, setFinalScore] = React.useState(0);
 
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const roundTransitionRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
   const startTimeRef = React.useRef<number | null>(null);
 
   const currentSettings = settings[difficulty];
 
-  const clearAllTimers = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (roundTransitionRef.current) clearTimeout(roundTransitionRef.current);
-  };
+  const startRound = React.useCallback(() => {
+    setWaiting(true);
+    setReady(false);
+    setLastTime(null);
 
-  const startRound = React.useCallback(
-    (targetDifficulty: Difficulty = difficulty) => {
-      clearAllTimers();
-      setWaiting(true);
-      setReady(false);
-      setLastTime(null);
+    const delay =
+      Math.floor(
+        Math.random() *
+          (currentSettings.waitMax -
+            currentSettings.waitMin +
+            1)
+      ) + currentSettings.waitMin;
 
-      const activeConfig = settings[targetDifficulty];
-      const delay =
-        Math.floor(
-          Math.random() * (activeConfig.waitMax - activeConfig.waitMin + 1)
-        ) + activeConfig.waitMin;
-
-      timerRef.current = setTimeout(() => {
-        setWaiting(false);
-        setReady(true);
-        startTimeRef.current = performance.now();
-      }, delay);
-    },
-    [difficulty]
-  );
+    timerRef.current = setTimeout(() => {
+      setWaiting(false);
+      setReady(true);
+      startTimeRef.current = performance.now();
+    }, delay);
+  }, [
+    currentSettings.waitMax,
+    currentSettings.waitMin,
+  ]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const value = params.get("difficulty");
 
-    if (value === "medium" || value === "hard") {
+    if (
+      value === "medium" ||
+      value === "hard"
+    ) {
       setDifficulty(value);
     }
 
-    return () => clearAllTimers();
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, []);
 
-  // Sync with Backend (Save score + AI predict difficulty concurrently)
+  // Save score to backend -> then AI predicts next difficulty
   React.useEffect(() => {
     if (!finished) return;
 
-    const averageResponseTime =
+    const averageTime =
       times.length > 0
-        ? times.reduce((sum, time) => sum + time, 0) / times.length / 1000
+        ? Math.round(
+            times.reduce((sum, time) => sum + time, 0) / times.length
+          )
         : 0;
 
-    const accuracy = Math.round(
-      (times.length / currentSettings.rounds) * 100
-    );
+    // No correct/wrong answers in this game, so accuracy is derived from
+    // how fast the average reaction was relative to this difficulty's time limit.
+    // Faster average = higher accuracy. Clamped between 0 and 100.
+    const accuracy = averageTime
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              100 - (averageTime / currentSettings.timeLimit) * 100
+            )
+          )
+        )
+      : 0;
 
-    const syncGameResults = async () => {
+    const saveScore = async () => {
       try {
         const storedUser = localStorage.getItem("user");
-        const user = storedUser ? JSON.parse(storedUser) : null;
-
-        const payload = {
-          accuracy,
-          score: finalScore,
-          time_taken: Number(averageResponseTime.toFixed(3)),
-        };
-
-        const requests: Promise<any>[] = [
-          fetch(`${API_URL}/api/difficulty/predict`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              if (data?.predicted_difficulty) {
-                localStorage.setItem("nextDifficulty", data.predicted_difficulty);
-              }
-            }),
-        ];
-
-        if (user?.id) {
-          requests.push(
-            fetch(`${API_URL}/api/games/submit`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                user_id: user.id,
-                game_name: "reaction-test",
-                ...payload,
-              }),
-            })
-          );
+        if (!storedUser) {
+          console.error("User not found in localStorage");
+          return;
         }
 
-        await Promise.allSettled(requests);
+        const user = JSON.parse(storedUser);
+
+        const response = await fetch(
+          "https://cognicare-ai.onrender.com/api/games/submit",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: user.id,
+              game_name: "reaction-test",
+              score: score,
+              accuracy: accuracy,
+              time_taken: averageTime / 1000, // convert ms to seconds
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error("Backend error:", data);
+          return;
+        }
+
+        console.log("Score saved successfully:", data);
       } catch (error) {
-        console.error("Failed to sync reaction test data:", error);
+        console.error("Failed to save score:", error);
       }
     };
 
-    syncGameResults();
-  }, [finished, finalScore, times, currentSettings.rounds]);
+    saveScore();
 
-  const startGame = (targetDifficulty: Difficulty = difficulty) => {
-    clearAllTimers();
+    const predictNextDifficulty = async () => {
+      try {
+        const response = await fetch(
+          "https://cognicare-ai.onrender.com/api/difficulty/predict",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              accuracy: accuracy,
+              score: score,
+              time_taken: averageTime / 1000,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        console.log("AI predicted difficulty:", data.predicted_difficulty);
+
+        localStorage.setItem("nextDifficulty", data.predicted_difficulty);
+      } catch (error) {
+        console.error("AI difficulty prediction failed:", error);
+      }
+    };
+
+    predictNextDifficulty();
+  }, [finished, score, times, currentSettings.timeLimit]);
+
+  const startGame = () => {
     setStarted(true);
     setFinished(false);
     setRound(1);
     setScore(0);
-    setFinalScore(0);
     setTimes([]);
     setLastTime(null);
 
-    startRound(targetDifficulty);
+    startRound();
   };
 
   const handleReaction = () => {
     if (!started || finished) return;
 
-    // False start handling
     if (waiting) {
-      clearAllTimers();
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
       setWaiting(false);
       setReady(false);
       setLastTime(null);
 
       if (round >= currentSettings.rounds) {
-        setFinalScore(score);
         setFinished(true);
         setStarted(false);
       } else {
         setRound((prev) => prev + 1);
-        roundTransitionRef.current = setTimeout(() => {
+        setTimeout(() => {
           startRound();
         }, 500);
       }
+
       return;
     }
 
@@ -191,7 +229,9 @@ export default function ReactionTestPage() {
       return;
     }
 
-    const reactionTime = performance.now() - startTimeRef.current;
+    const reactionTime =
+      performance.now() - startTimeRef.current;
+
     const roundedTime = Math.round(reactionTime);
 
     setLastTime(roundedTime);
@@ -199,66 +239,70 @@ export default function ReactionTestPage() {
 
     const points = Math.max(
       20,
-      Math.round(1000 / Math.max(reactionTime, 100))
+      Math.round(
+        1000 / Math.max(reactionTime, 100)
+      )
     );
 
-    const updatedScore = score + points;
-    setScore(updatedScore);
+    setScore((prev) => prev + points);
+
     setReady(false);
 
     if (round >= currentSettings.rounds) {
-      setFinalScore(updatedScore);
       setFinished(true);
       setStarted(false);
       return;
     }
 
-    roundTransitionRef.current = setTimeout(() => {
+    setTimeout(() => {
       setRound((prev) => prev + 1);
       startRound();
     }, 700);
   };
 
   const restart = () => {
-    clearAllTimers();
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
     setStarted(false);
     setFinished(false);
     setWaiting(false);
     setReady(false);
     setRound(1);
     setScore(0);
-    setFinalScore(0);
     setTimes([]);
     setLastTime(null);
     startTimeRef.current = null;
   };
 
-  const playAgain = () => {
-    const savedDifficulty = localStorage.getItem("nextDifficulty");
-    const nextDiff = (savedDifficulty || difficulty).toLowerCase() as Difficulty;
-    const validDiff =
-      nextDiff === "medium" || nextDiff === "hard" ? nextDiff : "easy";
-
-    setDifficulty(validDiff);
-    startGame(validDiff);
-  };
-
-  const changeDifficulty = (value: Difficulty) => {
+  const changeDifficulty = (
+    value: Difficulty
+  ) => {
     restart();
     setDifficulty(value);
   };
 
   const averageTime =
     times.length > 0
-      ? Math.round(times.reduce((sum, time) => sum + time, 0) / times.length)
+      ? Math.round(
+          times.reduce(
+            (sum, time) => sum + time,
+            0
+          ) / times.length
+        )
       : 0;
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-2xl">
+
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <Button variant="outline" onClick={() => router.push("/games")}>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/games")}
+          >
             <ArrowLeft className="mr-2 size-4" />
             Back
           </Button>
@@ -266,7 +310,9 @@ export default function ReactionTestPage() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 rounded-xl border bg-card px-4 py-2">
               <Trophy className="size-4" />
-              <span className="font-semibold">{score}</span>
+              <span className="font-semibold">
+                {score}
+              </span>
             </div>
 
             <div className="flex items-center gap-2 rounded-xl border bg-card px-4 py-2">
@@ -280,46 +326,83 @@ export default function ReactionTestPage() {
 
         {/* Title */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold">Reaction Test</h1>
+          <h1 className="text-3xl font-bold">
+            Reaction Test
+          </h1>
+
           <p className="mt-2 text-muted-foreground">
-            React as quickly as possible when the target appears.
+            React as quickly as possible when the
+            target appears.
           </p>
         </div>
 
-        {/* Difficulty Selectors */}
+        {/* Difficulty */}
         <div className="mb-6 flex justify-center gap-2">
-          {(["easy", "medium", "hard"] as Difficulty[]).map((level) => (
-            <Button
-              key={level}
-              variant={difficulty === level ? "default" : "outline"}
-              onClick={() => changeDifficulty(level)}
-            >
-              <span className="capitalize">{level}</span>
-            </Button>
-          ))}
+          <Button
+            variant={
+              difficulty === "easy"
+                ? "default"
+                : "outline"
+            }
+            onClick={() =>
+              changeDifficulty("easy")
+            }
+          >
+            Easy
+          </Button>
+
+          <Button
+            variant={
+              difficulty === "medium"
+                ? "default"
+                : "outline"
+            }
+            onClick={() =>
+              changeDifficulty("medium")
+            }
+          >
+            Medium
+          </Button>
+
+          <Button
+            variant={
+              difficulty === "hard"
+                ? "default"
+                : "outline"
+            }
+            onClick={() =>
+              changeDifficulty("hard")
+            }
+          >
+            Hard
+          </Button>
         </div>
 
-        {/* Game Box */}
+        {/* Game */}
         <div className="rounded-3xl border bg-card p-6 shadow-sm">
+
           <div className="mb-6 text-center">
             <p className="text-lg font-semibold">
               {!started
                 ? "Press Start to begin"
                 : finished
-                ? "Test Complete!"
-                : waiting
-                ? "Wait..."
-                : ready
-                ? "CLICK NOW!"
-                : "Get Ready..."}
+                  ? "Test Complete!"
+                  : waiting
+                    ? "Wait..."
+                    : ready
+                      ? "CLICK NOW!"
+                      : "Get Ready..."}
             </p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Difficulty: <span className="capitalize font-medium">{difficulty}</span>
+              Difficulty:{" "}
+              <span className="capitalize font-medium">
+                {difficulty}
+              </span>
             </p>
           </div>
 
-          {/* Target Arena */}
+          {/* Reaction Area */}
           {!finished && (
             <button
               onClick={handleReaction}
@@ -344,13 +427,14 @@ export default function ReactionTestPage() {
               {!started
                 ? "START"
                 : waiting
-                ? "WAIT"
-                : ready
-                ? "CLICK!"
-                : "GET READY"}
+                  ? "WAIT"
+                  : ready
+                    ? "CLICK!"
+                    : "GET READY"}
             </button>
           )}
 
+          {/* Last reaction */}
           {lastTime !== null && !finished && (
             <p className="mt-5 text-center text-lg font-semibold">
               Reaction time: {lastTime} ms
@@ -359,45 +443,71 @@ export default function ReactionTestPage() {
 
           {/* Controls */}
           <div className="mt-8 flex justify-center gap-3">
+
             {!started && !finished && (
-              <Button size="lg" onClick={() => startGame(difficulty)}>
+              <Button
+                size="lg"
+                onClick={startGame}
+              >
                 Start Game
               </Button>
             )}
 
             {started && (
-              <Button variant="outline" onClick={restart}>
+              <Button
+                variant="outline"
+                onClick={restart}
+              >
                 <RotateCcw className="mr-2 size-4" />
                 Restart
               </Button>
             )}
+
           </div>
 
-          {/* Finished State */}
+          {/* Result */}
           {finished && (
             <div className="mt-8 text-center">
-              <h2 className="text-2xl font-bold">Great Reaction! ⚡</h2>
+
+              <h2 className="text-2xl font-bold">
+                Great Reaction! ⚡
+              </h2>
+
               <p className="mt-2 text-muted-foreground">
                 You completed all rounds.
               </p>
 
-              <p className="mt-4 text-3xl font-bold">Score: {score}</p>
+              <p className="mt-4 text-3xl font-bold">
+                Score: {score}
+              </p>
+
               <p className="mt-2 text-lg font-semibold">
                 Average Reaction: {averageTime} ms
               </p>
 
+              <p className="mt-1 text-sm text-muted-foreground">
+                Difficulty:{" "}
+                <span className="capitalize">
+                  {difficulty}
+                </span>
+              </p>
+
               <div className="mt-6 flex justify-center gap-3">
-                <Button onClick={playAgain}>
+
+                <Button onClick={restart}>
                   <RotateCcw className="mr-2 size-4" />
                   Play Again
                 </Button>
 
                 <Button
                   variant="outline"
-                  onClick={() => router.push("/games")}
+                  onClick={() =>
+                    router.push("/games")
+                  }
                 >
                   Back to Games
                 </Button>
+
               </div>
             </div>
           )}
@@ -405,14 +515,32 @@ export default function ReactionTestPage() {
 
         {/* Instructions */}
         <div className="mt-6 rounded-2xl border bg-card p-5">
-          <h2 className="font-semibold">How to Play</h2>
+          <h2 className="font-semibold">
+            How to Play
+          </h2>
+
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li>• Wait for the target to turn ready.</li>
-            <li>• Click immediately when it appears.</li>
-            <li>• Clicking early counts as a false start for that round.</li>
-            <li>• Easy: 5 rounds | Medium: 7 rounds | Hard: 10 rounds.</li>
+            <li>
+              • Wait for the target to appear.
+            </li>
+            <li>
+              • Click immediately when it appears.
+            </li>
+            <li>
+              • Faster reactions give higher scores.
+            </li>
+            <li>
+              • Easy: 5 rounds.
+            </li>
+            <li>
+              • Medium: 7 rounds.
+            </li>
+            <li>
+              • Hard: 10 rounds.
+            </li>
           </ul>
         </div>
+
       </div>
     </main>
   );

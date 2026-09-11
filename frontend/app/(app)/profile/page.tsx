@@ -287,14 +287,95 @@ export default function ProfilePage() {
     setIsEditing(false)
   }
 
-  const unlocked = achievements.filter((a) => a.unlocked)
-
   const streak = getStreak(scores)
   const longestStreak = getLongestStreak(scores)
 
   const gamesPlayed = progress?.games_played ?? 0
   const cognitiveScore = progress ? Math.round(progress.average_score) : 0
   const minutesTrained = progress ? Math.round(progress.total_time / 60) : 0
+
+  // Compute real unlock status / progress for achievements we have data for.
+  // Achievements we can't yet measure (no backend tracking for weekly
+  // per-skill improvement) are left exactly as they come from mock-data,
+  // clearly still using placeholder progress until that's built.
+  const memoryMatchScores = scores.filter((s) => s.game_name === 'memory-match')
+  const bestMemoryScore =
+    memoryMatchScores.length > 0
+      ? Math.max(...memoryMatchScores.map((s) => s.score))
+      : 0
+
+  const reactionScores = scores.filter((s) => s.game_name === 'reaction-test')
+  const fastestReactionSeconds =
+    reactionScores.length > 0
+      ? Math.min(...reactionScores.map((s) => s.time_taken ?? Infinity))
+      : Infinity
+
+  const bestAccuracy =
+    scores.length > 0
+      ? Math.max(...scores.map((s) => s.accuracy ?? 0))
+      : 0
+
+  const focusSessionCount = scores.filter(
+    (s) => s.game_name === 'focus-challenge'
+  ).length
+
+  const computedAchievements = achievements.map((a) => {
+    switch (a.id) {
+      case 'a1': // 7-Day Streak
+        return {
+          ...a,
+          unlocked: streak >= 7,
+          progress: Math.min(100, Math.round((streak / 7) * 100)),
+        }
+      case 'a2': // Memory Master (900+ in Memory Match)
+        return {
+          ...a,
+          unlocked: bestMemoryScore >= 900,
+          progress: Math.min(100, Math.round((bestMemoryScore / 900) * 100)),
+        }
+      case 'a3': // Quick Draw (react under 300ms)
+        return {
+          ...a,
+          unlocked: fastestReactionSeconds < 0.3,
+          progress:
+            fastestReactionSeconds === Infinity
+              ? 0
+              : Math.min(
+                  100,
+                  Math.round((0.3 / fastestReactionSeconds) * 100)
+                ),
+        }
+      case 'a4': // Sharp Shooter (95% accuracy)
+        return {
+          ...a,
+          unlocked: bestAccuracy >= 95,
+          progress: Math.min(100, Math.round(bestAccuracy)),
+        }
+      case 'a5': // Focus Guru (20 focus sessions)
+        return {
+          ...a,
+          unlocked: focusSessionCount >= 20,
+          progress: Math.min(100, Math.round((focusSessionCount / 20) * 100)),
+        }
+      case 'a6': // Grandmaster (cognitive score 900+)
+        return {
+          ...a,
+          unlocked: cognitiveScore >= 900,
+          progress: Math.min(100, Math.round((cognitiveScore / 900) * 100)),
+        }
+      case 'a8': // Century Club (100 games)
+        return {
+          ...a,
+          unlocked: gamesPlayed >= 100,
+          progress: Math.min(100, Math.round((gamesPlayed / 100) * 100)),
+        }
+      default:
+        // a7 (Rising Star) has no backend tracking yet - left untouched
+        return a
+    }
+  })
+
+  const unlocked = computedAchievements.filter((a) => a.unlocked)
 
   const summary = [
     {
@@ -524,13 +605,13 @@ export default function ProfilePage() {
           <CardTitle>Achievements</CardTitle>
 
           <Badge variant="muted">
-            {unlocked.length}/{achievements.length} unlocked
+            {unlocked.length}/{computedAchievements.length} unlocked
           </Badge>
         </CardHeader>
 
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {achievements.map((a) => (
+            {computedAchievements.map((a) => (
               <AchievementBadge
                 key={a.id}
                 achievement={a}

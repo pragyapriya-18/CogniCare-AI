@@ -10,10 +10,12 @@ type Setting = { id: string; icon: LucideIcon; label: string; description: strin
 
 const settings: Setting[] = [
   { id: 'reminders', icon: Bell, label: 'Daily reminders', description: 'Get a nudge to keep your streak alive', default: true },
-  { id: 'sound', icon: Volume2, label: 'Game sounds', description: 'Play audio cues during games', default: true },
+  { id: 'sound', icon: Volume2, label: 'Game sounds', description: 'Play audio cues during games (coming soon)', default: true },
   { id: 'darkmode', icon: Moon, label: 'Reduced motion', description: 'Minimize animations for comfort', default: false },
-  { id: 'weekly', icon: Mail, label: 'Weekly report', description: 'Email me a summary of my progress', default: true },
+  { id: 'weekly', icon: Mail, label: 'Weekly report', description: 'Email me a summary of my progress (coming soon)', default: true },
 ]
+
+const STORAGE_KEY = 'mindforge-settings'
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
@@ -41,6 +43,37 @@ export function SettingsCard() {
   const [state, setState] = React.useState<Record<string, boolean>>(
     Object.fromEntries(settings.map((s) => [s.id, s.default])),
   )
+  const [loaded, setLoaded] = React.useState(false)
+
+  // Load saved preferences on mount
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        setState(JSON.parse(saved))
+      }
+    } catch {
+      // Keep defaults if parsing fails
+    }
+    setLoaded(true)
+  }, [])
+
+  // Persist to localStorage whenever settings change (skip the initial mount)
+  React.useEffect(() => {
+    if (!loaded) return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  }, [state, loaded])
+
+  // Actually apply "Reduced motion" globally by toggling a class on <html>,
+  // which CSS can use to disable/shorten animations app-wide.
+  React.useEffect(() => {
+    if (!loaded) return
+    document.documentElement.classList.toggle('reduce-motion', state.darkmode)
+  }, [state.darkmode, loaded])
+
+  const toggle = (id: string) => {
+    setState((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
 
   return (
     <Card>
@@ -62,7 +95,7 @@ export function SettingsCard() {
               <Toggle
                 on={state[s.id]}
                 label={s.label}
-                onClick={() => setState((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
+                onClick={() => toggle(s.id)}
               />
             </div>
           )

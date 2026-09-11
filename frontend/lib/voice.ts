@@ -2,7 +2,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: "en-IN", label: "English" },
   { code: "hi-IN", label: "हिंदी (Hindi)" },
   { code: "kn-IN", label: "ಕನ್ನಡ (Kannada)" },
-  { code: "kn-IN", label: "ಕನ್ನಡ (Kannada)" },
+  { code: "bn-IN", label: "বাংলা (Bengali)" },
 ];
 
 export function speak(text: string, language: string = "en-IN") {

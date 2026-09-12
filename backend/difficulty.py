@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from database import get_db_connection
 from psycopg2.extras import RealDictCursor
+from ai_model import predict_difficulty as ml_predict_difficulty
 
 
 def submit_performance():
@@ -149,6 +150,7 @@ def set_difficulty():
         cursor.close()
         connection.close()
 
+
 def predict_difficulty():
     data = request.get_json()
 
@@ -161,13 +163,8 @@ def predict_difficulty():
             "error": "accuracy and score are required"
         }), 400
 
-    # Simple rule-based prediction for now (placeholder until AI model is ready)
-    if accuracy >= 80:
-        predicted_difficulty = "hard"
-    elif accuracy >= 50:
-        predicted_difficulty = "medium"
-    else:
-        predicted_difficulty = "easy"
+    # Real ML-based prediction using a trained Decision Tree model
+    predicted_difficulty = ml_predict_difficulty(accuracy, score, time_taken)
 
     return jsonify({
         "predicted_difficulty": predicted_difficulty,
@@ -177,6 +174,7 @@ def predict_difficulty():
             "time_taken": time_taken
         }
     }), 200
+
 
 def get_difficulty(user_id, game_name):
     connection = get_db_connection()

@@ -89,9 +89,6 @@ def fetch_performance_history(user_id):
 def update_difficulty():
     return set_difficulty()
 
-@app.route("/api/difficulty/predict", methods=["POST"])
-def predict_game_difficulty():
-    return predict_difficulty()
 
 @app.route("/api/difficulty/<int:user_id>/<game_name>", methods=["GET"])
 def fetch_difficulty(user_id, game_name):

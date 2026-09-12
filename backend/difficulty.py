@@ -1,7 +1,7 @@
 from flask import request, jsonify
 from database import get_db_connection
 from psycopg2.extras import RealDictCursor
-from ai_model import predict_difficulty as ml_predict_difficulty
+from adaptive_model import predict_difficulty as ml_predict_difficulty
 
 
 def submit_performance():

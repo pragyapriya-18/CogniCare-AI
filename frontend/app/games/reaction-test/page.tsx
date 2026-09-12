@@ -79,11 +79,15 @@ export default function ReactionTestPage() {
     const params = new URLSearchParams(window.location.search);
     const value = params.get("difficulty");
 
+    const savedDifficulty = localStorage.getItem("nextDifficulty");
+    const actualDifficulty = value || savedDifficulty;
+    const normalizedDifficulty = actualDifficulty?.toLowerCase();
+
     if (
-      value === "medium" ||
-      value === "hard"
+      normalizedDifficulty === "medium" ||
+      normalizedDifficulty === "hard"
     ) {
-      setDifficulty(value);
+      setDifficulty(normalizedDifficulty);
     }
 
     return () => {
@@ -263,6 +267,17 @@ export default function ReactionTestPage() {
   const restart = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
+    }
+
+    const savedDifficulty = localStorage.getItem("nextDifficulty");
+    const nextDifficulty = savedDifficulty?.toLowerCase();
+
+    if (
+      nextDifficulty === "easy" ||
+      nextDifficulty === "medium" ||
+      nextDifficulty === "hard"
+    ) {
+      setDifficulty(nextDifficulty);
     }
 
     setStarted(false);
